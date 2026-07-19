@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "chatId": "5452598419",
+        "chatId": "YOUR_CHAT_ID",
         "text": "=⚠️ <b>Admin Alert: Human Needed</b>\n\n👤 <b>Customer:</b> {{ $json.customer_name || $json.query.customer_name }}\n💬 <b>Message:</b> \"{{ $json.customer_query || $json.query.customer_query }}\"\n🛠️ <b>Reason:</b> {{ $json.reason || \"No special\" }}\n\n🔗 <a href=\"https://business.facebook.com/latest/inbox/thread/{{ $json.sender_id ||$json.query.sender_id }}\">Open Messenger Inbox</a> {{ $json.customer_name || $json.query.customer_name }}",
         "additionalFields": {
           "appendAttribution": false,
@@ -18,7 +18,7 @@
       ],
       "id": "abdfbb08-b04a-454e-b021-9245f54a0574",
       "name": "Send a text message",
-      "webhookId": "0b2da178-4467-4364-81ae-879e7920d0c1",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -51,7 +51,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Admin Handover').item.json.query.sender_id }}\"\n  },\n  \"target_app_id\": 263902037430900,\n  \"metadata\": \"Customer needs human help - unknown intent\"\n}",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Admin Handover').item.json.query.sender_id }}\"\n  },\n  \"target_app_id\": \"YOUR_FACEBOOK_APP_ID\",\n  \"metadata\": \"Customer needs human help - unknown intent\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -96,7 +96,6 @@
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Send a text message": {
       "main": [

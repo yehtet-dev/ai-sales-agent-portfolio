@@ -16,7 +16,7 @@
         -240,
         240
       ],
-      "webhookId": "d5b5b97c-d522-4dce-8d45-09f753155d52",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -37,7 +37,7 @@
             {
               "id": "is-admin",
               "leftValue": "={{ $json.message.from.id }}",
-              "rightValue": "5452598419",
+              "rightValue": "YOUR_CHAT_ID",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -214,7 +214,7 @@
     },
     {
       "parameters": {
-        "chatId": "=5452598419",
+        "chatId": "=YOUR_CHAT_ID",
         "text": "={{ $json.command_type === 'inventory_approval' ? ($json.status === 'approved' ? '✅ Approved ' + $json.approved_quantity + ' units of ' + $json.product_name + '. Processing order...' : '❌ Rejected order for ' + $json.product_name + '.') : ($json.status === 'confirm' ? '✅ Payment confirmed. Creating order record...' : '❌ Payment rejected. Order will be marked as failed.') }}",
         "additionalFields": {}
       },
@@ -226,7 +226,7 @@
         880,
         352
       ],
-      "webhookId": "740a2014-68ef-4428-aedb-54cd51a11782",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -236,7 +236,7 @@
     },
     {
       "parameters": {
-        "chatId": "=5452598419",
+        "chatId": "=YOUR_CHAT_ID",
         "text": "❓ Invalid command. Please reply to a notification with:\n\n*For Order Approval:*\n• `approve <quantity>` - approve the order\n• `reject` - reject the order\n\n*For Payment Confirmation:*\n• `confirm` - payment is correct\n• `fail` - payment is invalid\n\nExamples:\n`approve 5`\n`reject`\n`confirm`\n`fail`",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -250,7 +250,7 @@
         640,
         368
       ],
-      "webhookId": "5e95f84a-5989-4224-9f41-9f11a853c9c3",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -272,7 +272,7 @@
         192,
         352
       ],
-      "webhookId": "acf6a6d1-db6e-4990-a17b-365e5b51425b",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -281,7 +281,6 @@
       }
     }
   ],
-  "pinData": {},
   "connections": {
     "Telegram Trigger": {
       "main": [

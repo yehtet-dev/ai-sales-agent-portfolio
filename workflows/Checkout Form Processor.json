@@ -49,7 +49,7 @@
       ],
       "id": "a53fcdc1-8306-46aa-a6d4-f268cb06c700",
       "name": "Order Checkout",
-      "webhookId": "1ddb3a2c-be96-4823-831e-6c8f794641ec"
+      "webhookId": "YOUR_WEBHOOK_ID"
     },
     {
       "parameters": {
@@ -162,7 +162,6 @@
       "alwaysOutputData": true
     }
   ],
-  "pinData": {},
   "connections": {
     "Order Checkout": {
       "main": [
