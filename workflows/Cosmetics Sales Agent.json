@@ -1,0 +1,1659 @@
+{
+  "name": "Cosmetics Sales Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4e25bfd4-a437-4445-9886-e60b0e048bc0",
+              "leftValue": "={{ $json.query['hub.mode'] }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "017534a8-c35b-4538-84cc-7ac02848d4f2",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "Lucky7",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1520,
+        1696
+      ],
+      "id": "6b041c45-afdf-4fd2-9807-e57f2333d032",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1648,
+        1664
+      ],
+      "id": "1979cc14-1a89-44ae-b0ae-3e9b067858f9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "path": "ai-guru-costmetics",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1312,
+        1968
+      ],
+      "id": "7648f501-849a-4eab-bb29-10c6aa953571",
+      "name": "fb-verify",
+      "webhookId": "133a867e-d662-4243-a165-43b94d86cfba"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-messaging",
+              "leftValue": "={{  $json.body.entry[0].messaging}}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "f77cc039-5e38-4b0e-816d-54e4859c960b",
+      "name": "Has Messaging Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        2096
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract messaging data from Facebook webhook payload\nconst entry = $input.first().json.body.entry[0];\nconst messaging = entry.messaging[0];\n\n// --- 🛑 THE BUG FIX: KILL ECHOES AND RECEIPTS ---\nif (messaging.delivery || messaging.read || (messaging.message && messaging.message.is_echo)) {\n  return []; \n}\n// ------------------------------------------------\n\nconst senderId = messaging.sender.id;\nconst timestamp = messaging.timestamp;\n\nlet messageText = '';\nlet imageUrl = '';\nlet messageType = 'text';\n\n// Catch standard text and images\nif (messaging.message) {\n  if (messaging.message.text) {\n    messageText = messaging.message.text;\n    messageType = 'text';\n  }\n  if (messaging.message.attachments) {\n    const imageAttachment = messaging.message.attachments.find(\n      att => att.type === 'image'\n    );\n    if (imageAttachment) {\n      imageUrl = imageAttachment.payload.url;\n      messageType = imageUrl ? 'image' : messageType;\n    }\n  }\n}\n\n// Catch Facebook Native Menu button clicks\nif (messaging.postback && messaging.postback.payload) {\n  messageText = messaging.postback.payload;\n  messageType = 'text';\n}\n\nreturn [{\n  json: {\n    senderId,\n    timestamp,\n    messageText,\n    imageUrl,\n    messageType,\n    rawMessage: messaging\n  }\n}];"
+      },
+      "id": "05620273-b259-4375-a602-adb951a992ad",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        1984
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "=define",
+        "text": "=Customer (Facebook Sender ID: {{ $json.senderId }}) sent:\n\n{{ $json.is_payment_slip ? 'PAYMENT_RECEIPT' : ($json.matched ? 'Image of Product identified as: ' + $json.product_name : '') }}\n{{ $json.messageText ? 'Message: ' + $json.messageText : '' }}\n\nHandle this customer interaction following the sales process.",
+        "options": {
+          "systemMessage": "Role: AI Cosmetics Personal Shopper for 'AI Guru' on FB Messenger. Language: Burmese ONLY.\n\n<rules>\n1. CART_MANAGEMENT (CRITICAL): You hold a virtual shopping cart. Keep a mental list of all items and quantities the user wants. \n2. INITIAL_ROUTING: If the user sends a generic greeting, reply: \"AI Guru မှ ကြိုဆိုပါတယ်ရှင်။\" and offer the options: \"🛍️ ပစ္စည်းကြည့်မယ်\", \"🛒 တန်းဝယ်မယ်\", \"💬 အခြားမေးမြန်းရန်\".\n3.1 - BROWSER_PATH: If the user clicks \"🛍️ ပစ္စည်းကြည့်မယ်\" OR naturally asks to browse/see products, DO NOT call any tools yet. Reply EXACTLY with: \"အောက်ပါ အမျိုးအစားများမှ မိမိစိတ်ဝင်စားသော အမျိုးအစားကို ရိုက်ထည့်၍ ရှာဖွေနိုင်ပါတယ်ရှင် -\\n1. Body Care\\n2. Body Scrub\\n3. Fragrance\\n4. Haircare\\n5. Makeup\\n6. Nail Care\\n7. Skincare\\n8. Sun Care\"\n3.2 -  DIRECT_PATH (IMAGE OR TEXT): \n- If the user clicks or types \"🛒 တန်းဝယ်မယ်\", DO NOT show categories. Reply EXACTLY with: \"ဟုတ်ကဲ့ပါရှင်။ ဝယ်ယူလိုသော ပစ္စည်းအမည်နှင့် အရေအတွက်ကို စာဖြင့် ရိုက်ထည့်၍သော်လည်းကောင်း၊ ပုံလေးပို့၍သော်လည်းကောင်း မှာယူနိုင်ပါတယ်ရှင်။\"\n\n4. SHOW_CATALOG: When the user replies with a category name (e.g., \"Skincare\"), call the 'show_product_carousel' tool. After the tool finishes, output EXACTLY this text and STOP: \"အထက်ပါ ပစ္စည်းများကို လေ့လာနိုင်ပါတယ်ရှင်။ ဝယ်ယူလိုပါက ပုံအောက်ရှိ '🛒 ဝယ်မယ်' ကို နှိပ်၍ အလွယ်တကူ မှာယူနိုင်ပါတယ်ရှင်။\"\n\nRule 5 & 6: UNIFIED BUYING LOGIC \n\nA.INPUT GATHERING:\nIf input is Image ID String (e.g., Image of Product identified as: [Item]) OR Button Payload (BUY_[Item]) OR Text: Extract the [Product Name].\nIF [Quantity] is missing: Immediately ask EXACTLY: \"ဟုတ်ကဲ့ပါရှင်။ [Product Name] လေးကို အရေအတွက် ဘယ်လောက်ယူမလဲရှင်။\" and STOP. (Do not call tool yet).\n\nB.ONE-SHOT TOOL CALL:\nOnce you have both [Product Name] and [Quantity]:\nFirst Response: Reply EXACTLY: \"ပစ္စည်းလက်ကျန် ရှိ၊ မရှိ ခဏလေး စစ်ပေးပါမယ်ရှင်။\"\nAction: Call update_cart_db with keyword, quantity, and sender_id.\n\nC.DETERMINISTIC OUTPUT (Based on Tool Status):\nIF success: Reply ONLY: \"✅ [Item] ([Qty]) ခုကို ခြင်းတောင်းထဲ ထည့်လိုက်ပါပြီ။ တခြား ဘာထပ်ယူဦးမလဲရှင်။\"\nIF multiple_matches: Reply ONLY: \"ဒီပစ္စည်းလေးမှာ အောက်ပါ အမျိုးအစားလေးတွေ ရှိပါတယ်ရှင် -\\n[variations_list]\\nဘယ်ဟာလေး ယူချင်ပါသလဲရှင့်။\"\nIF failed / not_found: Reply ONLY: \"ဝမ်းနည်းပါတယ်ရှင်။ [Item] လေးက လက်ရှိမှာ ပစ္စည်းပြတ်နေလို့ပါရှင့်။ တခြားထဲကရော ကြည့်ဦးမလားရှင့်။\"\n\n7. BYPASS_FALLBACK (CHECKOUT & VIEW CART): The system now uses bypass buttons for Checkout and View Cart. If the user types naturally asking to checkout, pay, or view their cart, DO NOT call any tools. Reply EXACTLY with: \"ကျေးဇူးပြု၍ အောက်ခြေရှိ '📦 အော်ဒါတင်မယ်' သို့မဟုတ် '🛒 ခြင်းတောင်းကြည့်မယ်' ခလုတ်ကို နှိပ်ပေးပါရှင်။\"\n8. NO_PERSONAL_DATA: NEVER ask for the user's Name, Phone, or Address in the chat. The checkout form handles this.\n9. VERIFY_PAYMENT (CRITICAL): If the user's input contains the exact phrase \"PAYMENT_RECEIPT\", this means they have sent a payment screenshot. You MUST immediately call the 'verify_payment' tool. DO NOT say anything else and DO NOT trigger the Rule 7 Checkout fallback.10. ADMIN_HANDOVER: Call 'notify_admin' for delivery status tracking, skin/allergy advice, or explicit requests to talk to a human. \n11. CASUAL_IGNORE: For casual filler (\"ok\", \"thanks\", \"ဟုတ်ကဲ့\"), reply \"ဟုတ်ကဲ့ပါရှင်။\" and do not call tools.\n12. HIDDEN_PAYLOAD_HANDLING: If the user's message starts with \"UPDATE_CART:\" or \"REPLACE_CART:\", they have clicked a system button. DO NOT reply to the text literally. \n- If the text is \"REPLACE_CART:EMPTY\", empty your mental cart. Reply EXACTLY with: \"ဟုတ်ကဲ့ပါရှင်။ တခြား ဘယ်ပစ္စည်းလေးတွေများ ဆက်ကြည့်ချင်ပါသေးလဲရှင်။\"\n- If the message starts with \"REPLACE_CART:\" (and has items), OVERWRITE your mental cart. Reply EXACTLY with: \"ဟုတ်ကဲ့ပါရှင်။ ကုန်သွားတဲ့ ပစ္စည်းအစား ဘယ်ပစ္စည်းလေးတွေနဲ့ အစားထိုးပြီး ယူချင်ပါသလဲရှင်။\"\n- If the message starts with \"UPDATE_CART:\", OVERWRITE your mental cart. Then reply EXACTLY with: \"ကျေးဇူးပြု၍ အောက်ခြေရှိ '📦 အော်ဒါတင်မယ်' ခလုတ်ကို ပြန်လည်နှိပ်၍ အော်ဒါ အတည်ပြုပေးပါရှင်။\"\n</rules>\n\n<process>\n[S1-GREET]: User says hi -> Ask what category they want.\n[S2-BUILD_CART]: User selects items -> Apply Quantity Rules -> Call update_cart_db -> Ask what else they want.\n[S3-CHECKOUT]: User is done -> Direct them to click the checkout button -> Stop.\n</process>",
+          "maxIterations": 15
+        }
+      },
+      "id": "eacf7413-139e-4036-bf8e-c2db36c5b10c",
+      "name": "AI Sales Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2928,
+        2080
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.senderId }}",
+        "contextWindowLength": 15
+      },
+      "id": "573ebe5c-00ed-4885-a147-bc2a860a4e30",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2752,
+        2432
+      ]
+    },
+    {
+      "parameters": {
+        "name": "verify_payment",
+        "description": "Call this tool to verify payment",
+        "source": "=database",
+        "workflowId": "=aeZNBnuYaXhhFehi",
+        "fields": {
+          "values": [
+            {
+              "name": "sender_id",
+              "stringValue": "={{ $('Extract Message Data').first().json.senderId }}"
+            },
+            {
+              "name": "image_data",
+              "stringValue": "={{ $('Convert to Base64').first().json.customer_image_data }}"
+            }
+          ]
+        },
+        "jsonSchemaExample": ""
+      },
+      "id": "078528ed-74fc-4845-b674-4024f2d81307",
+      "name": "Verify Payment Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        3056,
+        2496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log errors for debugging\nconst error = $input.first().json;\nconsole.log('Error in Facebook Sales Agent:', JSON.stringify(error));\nreturn [{ json: { status: 'error', message: 'An error occurred processing the message' } }];"
+      },
+      "id": "c2844d8a-a96a-466e-86b1-4865f7c3f55f",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3456,
+        2672
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b502118b-b5b9-4386-b534-093076d86e08",
+      "name": "Acknowledge FB Event",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        2272
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.imageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "2b5c6ee9-1c74-4f58-9589-c6fdb9bb51de",
+      "name": "Download Customer Image Early",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        2176
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No image - pass through original message data\nconst messageData = $('Extract Message Data').first().json;\n\nreturn [{\n  json: {\n    ...messageData,\n    imageBase64: ''\n  }\n}];"
+      },
+      "id": "bbff1011-aadd-4dc7-9994-902a401e437e",
+      "name": "No Image Path",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        2528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c3fb2809-5202-45ff-9113-9354d6f1bd20",
+              "leftValue": "={{ $json.imageUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1648,
+        2496
+      ],
+      "id": "b180b148-8323-4898-8203-29b676f9fead",
+      "name": "Has Image"
+    },
+    {
+      "parameters": {
+        "description": "Call this tool to notify the human admin. You MUST provide the customer's name, their Facebook sender_id, and the full text of their current request so the admin knows what the conversation is about.\n\n***Send data in json format like that:\n\n{\n  \"customer_name\": \"Ye Htet\",\n  \"sender_id\": \"27047995408169808\",\n  \"customer_query\": \"Want to talk to admin about my skin allergy\"\n}",
+        "workflowId": {
+          "__rl": true,
+          "value": "=B4OtYMVQAkrCu9Ng",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/=B4OtYMVQAkrCu9Ng"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_name', `If the customer has not provided their name yet, pass 'Unknown' for the customer_name.`, 'string') }}",
+            "sender_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('sender_id', ``, 'string') }}",
+            "customer_query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_query', ``, 'string') }}",
+            "timestamp": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('timestamp', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "customer_query",
+              "displayName": "customer_query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3216,
+        2432
+      ],
+      "id": "972c9804-2bb6-4bcf-995a-077fd130b491",
+      "name": "Admin handover"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  (function() {\n    const text = $json.output || $json.message || \"စနစ်အနည်းငယ် နှောင့်နှေးနေပါသည်။ Admin မှ မကြာမီ ဆက်သွယ်ပေးပါမည်ရှင်။\";\n    \n    const payload = {\n      \"recipient\": {\n        \"id\": $('Extract Message Data').first().json.senderId\n      },\n      \"message\": {\n        \"text\": text\n      }\n    };\n\n    // Only hide the buttons if the AI is sending the Checkout Form Link\n    if (!text.includes(\"http\") && !text.includes(\"လင့်ခ်\")) {\n      payload.message.quick_replies = [\n        {\n          \"content_type\": \"text\",\n          \"title\": \"🛒 ခြင်းတောင်းကြည့်မယ်\",\n          \"payload\": \"VIEW_CART\"\n        },\n        {\n          \"content_type\": \"text\",\n          \"title\": \"📦 အော်ဒါတင်မယ်\",\n          \"payload\": \"CHECKOUT_NOW\"\n        }\n      ];\n    }\n\n    return JSON.stringify(payload);\n  })() \n}}",
+        "options": {}
+      },
+      "id": "ec2c318d-edfe-4d8d-b09d-4f4d33702596",
+      "name": "Send Facebook Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3616,
+        2016
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "89967746-ada8-4f8f-917a-da2e66b2dd61",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "Admin",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3264,
+        2096
+      ],
+      "id": "fbbca58d-c09e-4a78-bf3a-bc8c50fcc41d",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ff514720-d6f2-40b0-86e9-0d310d68fd3c",
+              "leftValue": "={{ $json.messageText }}",
+              "rightValue": "=^(hi|hello|hey|မင်္ဂလာပါ|ဟိုင်း|mingalabar)",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2496,
+        2000
+      ],
+      "id": "c20ddc93-b33a-4e89-a28e-c666d035cf47",
+      "name": "Is Greeting?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Extract Message Data').first().json.senderId }}\"\n  },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": {\n    \"text\": \"AI Guru မှ ကြိုဆိုပါတယ်ရှင်။ ဘယ်လို ဝန်ဆောင်မှုမျိုးကို အသုံးပြုချင်ပါသလဲရှင်။\",\n    \"quick_replies\": [\n      {\n        \"content_type\": \"text\",\n        \"title\": \"🛍️ ပစ္စည်းကြည့်မယ်\",\n        \"payload\": \"🛍️ ပစ္စည်းကြည့်မယ်\"\n      },\n      {\n        \"content_type\": \"text\",\n        \"title\": \"🛒 တန်းဝယ်မယ်\",\n        \"payload\": \"🛒 တန်းဝယ်မယ်\"\n      },\n      {\n        \"content_type\": \"text\",\n        \"title\": \"💬 အခြားမေးမြန်းရန်\",\n        \"payload\": \"💬 အခြားမေးမြန်းရန်\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2736,
+        1936
+      ],
+      "id": "17036859-8fb5-44f4-b25c-1aed671fa48f",
+      "name": "Send Welcome Menu",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-guru-costmetics",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1088,
+        2272
+      ],
+      "id": "39075d7c-58f7-4704-85c7-c19dab775c99",
+      "name": "Facebook Webhook",
+      "webhookId": "133a867e-d662-4243-a165-43b94d86cfba"
+    },
+    {
+      "parameters": {
+        "description": "Use this tool to show a carousel of products when the user selects a specific category",
+        "workflowId": {
+          "__rl": true,
+          "value": "CFxwy9s1uzpHEfmP",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/CFxwy9s1uzpHEfmP",
+          "cachedResultName": "Cosmetics - Catalog Browser"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "category_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('category_name', ``, 'string') }}",
+            "sender_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('sender_id', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "category_name",
+              "displayName": "category_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3360,
+        2384
+      ],
+      "id": "57f4a7c9-a258-402a-9eff-d9dc5b550c75",
+      "name": "show_product_carousel"
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "value": "ai-guru-496118",
+          "mode": "id"
+        },
+        "modelName": "gemini-2.5-pro",
+        "options": {
+          "maxOutputTokens": 2000,
+          "temperature": 0.1,
+          "safetySettings": {
+            "values": [
+              {
+                "category": "HARM_CATEGORY_HATE_SPEECH"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleVertex",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        2784
+      ],
+      "id": "5f6c2cf4-ae1d-4014-9e58-4f0898e5203c",
+      "name": "Google Vertex Chat Model",
+      "credentials": {
+        "googleApi": {
+          "id": "A3Y1smiIIBlqZawq",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        2560
+      ],
+      "id": "51a319e3-2f0e-4df2-b229-8bd2577f5e28",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "8E72mgNgIIPFihIp",
+          "name": "Cosmetics"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 643198829,
+          "mode": "list",
+          "cachedResultName": "inventory",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+        },
+        "options": {}
+      },
+      "id": "c657df7a-4a70-4551-bf4e-6aab16e440fc",
+      "name": "Google Sheets - Get All Products",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2032,
+        2240
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GTOnKzQi6CDRzrHA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const imgData = $('Convert to Base64').first().json;\nconst products = $input.all().map(item => item.json);\n\nconst catalog = products.map((p, i) => ({\n  name: p['Product Name'] || '',\n  image_url: p['Product Image URL'] || ''\n}));\n\nconst catalogText = catalog.map(p => p.name + ' (Image: ' + p.image_url + ')').join(' | ');\n\nreturn [{\n  json: {\n    ...imgData, // အရှေ့က Base64 Data နဲ့ စာသားတွေ အကုန်သယ်လာမည်\n    catalog_text: catalogText\n  }\n}];"
+      },
+      "id": "d45e39ab-82a9-4a6d-8804-67788901de6a",
+      "name": "Prepare Product Catalog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        2176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openRouterApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"google/gemini-2.5-flash\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an image classifier for a cosmetics business. First, check if the customer's image is a Payment Receipt/Bank Slip (e.g., KBZ Pay, Wave Pay). If yes, set 'is_payment_slip' to true. Second, if it is a product, identify which product from our catalog matches it. IMPORTANT: Respond with ONLY a valid JSON object. Format: { \\\"is_payment_slip\\\": boolean, \\\"matched\\\": boolean, \\\"product_name\\\": \\\"exact name from catalog or empty string\\\", \\\"confidence\\\": \\\"high/medium/low\\\", \\\"reason\\\": \\\"brief explanation\\\" }\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Identify the image. Our product catalog: {{ $json.catalog_text }}\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"{{ $json.customer_image_data }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"max_tokens\": 500,\n  \"temperature\": 0.1\n}",
+        "options": {}
+      },
+      "id": "66745dea-17a5-447c-981e-bbda85d779ff",
+      "name": "AI Identify Product from Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2384,
+        2208
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "8E72mgNgIIPFihIp",
+          "name": "Cosmetics"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first().json;\nconst catalogData = $('Prepare Product Catalog').first().json;\nconst content = aiResponse.choices[0].message.content;\n\nlet parsed = { is_payment_slip: false, matched: false, product_name: '' };\ntry {\n  let cleanContent = content.trim();\n  if (cleanContent.startsWith('```')) {\n    cleanContent = cleanContent.replace(/```json?\\n?/g, '').replace(/```/g, '').trim();\n  }\n  parsed = JSON.parse(cleanContent);\n} catch (e) {}\n\nreturn [{\n  json: {\n    ...catalogData, \n    is_payment_slip: parsed.is_payment_slip || false,\n    matched: parsed.matched,\n    product_name: parsed.product_name\n  }\n}];"
+      },
+      "id": "8a9820fd-44cc-45e1-8c0d-43632b493396",
+      "name": "Parse AI Identification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        2192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const msgData = $('Extract Message Data').first().json;\nlet customerImageData = msgData.imageUrl;\n\ntry {\n    const buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\n    const mimeType = $input.first().binary.data.mimeType || 'image/jpeg';\n    customerImageData = 'data:' + mimeType + ';base64,' + buffer.toString('base64');\n} catch (e) {}\n\nreturn [{\n    json: {\n        ...msgData,\n        customer_image_data: customerImageData\n    }\n}];"
+      },
+      "id": "20ff5dc8-b6ec-46d6-9fd5-a951e8316374",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "name": "check_inventory",
+        "description": "Check product pricing, availability, and details. \nCRITICAL RULE: ONLY call this tool if the customer EXPLICITLY ASKS a question about the price,, or stock status(in stock/out of stock) of a specific product (e.g., \"How much is this?\"). \nDO NOT call this tool when the customer is simply ordering or adding items to their cart (e.g., \"Snail white 2\"). For orders, just add them to the DRAFT_CART without using this tool.",
+        "workflowId": "=Wj2GxWXkVvknfFTe",
+        "fields": {
+          "values": [
+            {
+              "name": "product_name",
+              "stringValue": "={{ $fromAI('product_name', 'The name of the product to check') }}"
+            },
+            {
+              "name": "sender_id",
+              "stringValue": "={{ $('Extract Message Data').item.json.senderId || $json.senderId}}"
+            },
+            {
+              "name": "action",
+              "stringValue": "={{ $fromAI('action', 'Either check (for product info lookup) or order (to place order and request admin approval). Default is check.', 'string') }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n  \"action\": \"check\",\n  \"product_name\": \"Snail White Cream\"\n}"
+      },
+      "id": "a2bafe83-8253-4ad8-8fab-ec64087fdb4c",
+      "name": "check_price_and_info",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        2976,
+        2720
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Call this tool to check inventory and add an item to the cart. You MUST provide the 'keyword' (product name), 'quantity' (number), and 'sender_id'. Do NOT send the whole cart summary. The tool will automatically handle the database logic and return a status (success, multiple_matches, failed, or not_found). You must wait for this response to reply to the user.",
+        "workflowId": {
+          "__rl": true,
+          "value": "fDl5fSLMmVeMZmYM",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fDl5fSLMmVeMZmYM",
+          "cachedResultName": "Cosmetics - Update Cart (Fixed Overwrite)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sender_id": "={{ $fromAI('sender_id', ``, 'string') }}",
+            "quantity": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('quantity', ``, 'number') }}",
+            "keyword": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('keyword', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "cart_data",
+              "displayName": "cart_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "quantity",
+              "displayName": "quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "keyword",
+              "displayName": "keyword",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        3184,
+        2640
+      ],
+      "id": "0d945c81-e759-4da9-871c-5bf50b9d62db",
+      "name": "update_cart_db"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.rawMessage.message.quick_reply.payload }}",
+                    "rightValue": "CHECKOUT_NOW",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f3b9264d-9f61-484c-9ad3-063cd0fc53f3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Check Out"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d2e66803-3335-41e5-8e97-0d1b7b2fee37",
+                    "leftValue": "={{ $json.rawMessage.message.quick_reply.payload }}",
+                    "rightValue": "VIEW_CART",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "View Cart"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c5b4ea7c-c8ce-4cbe-acb8-20de17cf2cc6",
+                    "leftValue": "={{ $json.rawMessage.message.quick_reply.payload }}",
+                    "rightValue": "BROWSE_PRODUCTS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Browse Products"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1904,
+        1920
+      ],
+      "id": "0599b8c1-6029-40d2-99bc-cefb00f9f665",
+      "name": "Switch",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.senderId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2304,
+        1680
+      ],
+      "id": "f52b54f6-2270-452c-991f-b4564f078ce5",
+      "name": "Get Checkout Data"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": { \"id\": \"{{ $('Extract Message Data').first().json.senderId }}\" },\n  \"message\": {\n    \"attachment\": {\n      \"type\": \"template\",\n      \"payload\": {\n        \"template_type\": \"button\",\n        \"text\": \"အော်ဒါတင်ရန်အတွက် အောက်ပါခလုတ်ကို နှိပ်ပေးပါရှင်။\",\n        \"buttons\": [\n          {\n            \"type\": \"web_url\",\n            \"url\": \"{{ $json.finalUrl }}\",\n            \"title\": \"📦 အော်ဒါတင်မယ်\",\n            \"webview_height_ratio\": \"full\"\n          }\n        ]\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2864,
+        1568
+      ],
+      "id": "168ba33d-ccbd-4d59-a976-7de4614227c7",
+      "name": "Send Checkout Link",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst senderId = $('Extract Message Data').first().json.senderId || \"\"; \n\n// ခြင်းတောင်း အလွတ်ဖြစ်နေရင်\nif (rows.length === 0 || !rows[0].json.ai_json || rows[0].json.ai_json.trim() === \"\") {\n    return { \n        sender_id: senderId,\n        replyMessage: \"သင့် ခြင်းတောင်းထဲတွင် ပစ္စည်းမရှိသေးပါရှင်။ ကျေးဇူးပြု၍ ဝယ်ယူလိုသော ပစ္စည်းကို အရင်ရွေးချယ်ပေးပါနော်။\" \n    };\n}\n\n// ခြင်းတောင်းထဲ ပစ္စည်းရှိရင်\nlet cartItemsString = rows[0].json.ai_json;\nlet formattedCartForUrl = cartItemsString;\n\ntry {\n    // JSON ကို Form တွင် ကြည့်ကောင်းအောင် ရိုးရိုးစာသားအဖြစ် ပြောင်းမည်\n    let cartObject = cartItemsString;\n    if (typeof cartItemsString === 'string') {\n        cartObject = JSON.parse(cartItemsString);\n    }\n\n    let tempArray = [];\n    for (const [itemName, quantity] of Object.entries(cartObject)) {\n        tempArray.push(`${itemName} (${quantity} ခု)`); // ဥပမာ: \"iUNIK (10 ခု)\"\n    }\n    // ပစ္စည်းများကို ကော်မာ (,) ဖြင့် ဆက်ပေးမည်\n    formattedCartForUrl = tempArray.join(\", \"); \n} catch (e) {\n    formattedCartForUrl = cartItemsString;\n}\n\n// Checkout Link တည်ဆောက်မည်\nconst formBaseUrl = \"https://n8n-djj9.srv1639829.hstgr.cloud/form/1ddb3a2c-be96-4823-831e-6c8f794641ec\";\nconst finalUrl = `${formBaseUrl}?sender_id=${encodeURIComponent(senderId)}&cart_summary=${encodeURIComponent(formattedCartForUrl)}`;\n\nreturn {\n    sender_id: senderId,\n    replyMessage: `ကျေးဇူးပြု၍ အောက်ပါလင့်ခ်တွင် ဝင်ရောက်၍ ပို့ဆောင်ပေးရမည့် အချက်အလက်များကို ဖြည့်သွင်းပေးပါရှင်:\\n\\n${finalUrl}\\n\\n(အချက်အလက်များ ဖြည့်သွင်းပြီးပါက ပစ္စည်းလက်ကျန် စစ်ဆေးပြီး စနစ်မှ ကျသင့်ငွေကို အလိုအလျောက် တွက်ချက်ပေးပါမည်ရှင်။)`,\n  finalUrl\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        1648
+      ],
+      "id": "67293ef6-5638-4b3d-842e-a6c50f8b824a",
+      "name": "Build Checkout Link"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst senderId = $('Extract Message Data').first().json.senderId || \"\"; // သင့် Webhook Node နာမည်နဲ့ ကိုက်ညီအောင် ပြင်ပါ\n\n// ခြင်းတောင်း အလွတ်ဖြစ်နေရင်\nif (rows.length === 0 || !rows[0].json.ai_json || rows[0].json.ai_json.trim() === \"\") {\n    return { \n        sender_id: senderId,\n        replyMessage: \"လူကြီးမင်းရဲ့ ခြင်းတောင်းထဲမှာ ဘာပစ္စည်းမှ မရှိသေးပါဘူးရှင်။ ကျွန်မတို့ရဲ့ ပစ္စည်းလေးတွေကို အရင်ကြည့်ရှုပေးပါဦးနော်။\" \n    };\n}\n\n// ခြင်းတောင်းထဲ ပစ္စည်းရှိရင်\nlet cartItemsString = rows[0].json.ai_json;\nlet formattedList = \"\";\n\ntry {\n    // Stringified JSON ဖြစ်နေလျှင် Object အဖြစ် အရင်ပြောင်းမည်\n    let cartObject = cartItemsString;\n    if (typeof cartItemsString === 'string') {\n        cartObject = JSON.parse(cartItemsString);\n    }\n\n    // 🎯 ပုံစံအသစ် (Array of Objects) ဖြင့် ဝင်လာခဲ့လျှင်\n    if (Array.isArray(cartObject)) {\n        cartObject.forEach(item => {\n            const itemName = item.product_name || \"ပစ္စည်းအမည်မသိ\";\n            const quantity = item.quantity || 1;\n            formattedList += `• ${itemName} x (${quantity}) ခု\\n`;\n        });\n    } \n    // 🎯 ပုံစံဟောင်း (Dictionary) ဖြင့် ဝင်လာခဲ့လျှင် (အရန်အဖြစ်ထားရန်)\n    else {\n        for (const [itemName, quantity] of Object.entries(cartObject)) {\n            formattedList += `• ${itemName} x (${quantity}) ခု\\n`;\n        }\n    }\n} catch (e) {\n    // အကယ်၍ JSON parse လုပ်လို့မရရင်\n    formattedList = cartItemsString; \n}\n\nreturn { \n    sender_id: senderId,\n    replyMessage: `ယခု ခြင်းတောင်းထဲတွင် အောက်ပါပစ္စည်းများ ရှိနေပါတယ်ရှင်:\\n\\n${formattedList}\\nအော်ဒါ တန်းတင်လိုက်တော့မလားရှင့်။ တခြားကြည့်ချင်တာ ရှိသေးလားရှင့်` \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        1808
+      ],
+      "id": "d7e26187-8554-4d73-a15b-2f0f1e6c40c1",
+      "name": "Build ViewCart Data"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Extract Message Data').first().json.senderId }}\"\n  },\n  \"message\": {\n    \"text\": {{ JSON.stringify($json.replyMessage) }},\n    \"quick_replies\": [\n      {\n        \"content_type\": \"text\",\n        \"title\": \"📦 အော်ဒါတင်မယ်\",\n        \"payload\": \"CHECKOUT_NOW\"\n      },\n      {\n        \"content_type\": \"text\",\n        \"title\": \"🛍️ ပစ္စည်းဆက်ကြည့်မယ်\",\n        \"payload\": \"BROWSE_PRODUCTS\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2816,
+        1760
+      ],
+      "id": "7c8661e3-9297-4ccd-8d07-736604160b1b",
+      "name": "Send ViewCart Data",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.senderId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        1840
+      ],
+      "id": "3fbdd22a-7b32-46e2-8cc3-e9c11e0c8761",
+      "name": "Get ViewCart Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const senderId = $('Extract Message Data').first().json.senderId || \"\"; // သင့် Webhook Node နာမည်နဲ့ ကိုက်ညီအောင် ပြင်ပါ\n\nconst categoryText = \"အောက်ပါ အမျိုးအစားများမှ မိမိစိတ်ဝင်စားသော အမျိုးအစားကို ရိုက်ထည့်၍ ရှာဖွေနိုင်ပါတယ်ရှင် -\\n1. Body Care\\n2. Body Scrub\\n3. Fragrance\\n4. Haircare\\n5. Makeup\\n6. Nail Care\\n7. Skincare\\n8. Sun Care\";\n\nreturn {\n    sender_id: senderId,\n    replyMessage: categoryText\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        1456
+      ],
+      "id": "2b310d6e-4df1-4ac1-a8b6-879f8f1ff1b1",
+      "name": "Build Browse Products Msg"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $json.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": {{ JSON.stringify($json.replyMessage) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2192,
+        1440
+      ],
+      "id": "22d58ff2-1d3e-4560-bf02-279a50269952",
+      "name": "Send Browse Products",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.senderId }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1216,
+        1232
+      ],
+      "id": "3bcea16d-3204-4b8f-a2f3-8faf031e8e18",
+      "name": "Get row(s)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.senderId }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2624,
+        1520
+      ],
+      "id": "cbeb1922-f59a-4313-b87c-4be154783d7c",
+      "name": "Get row(s)1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.sender_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ai_json": "={{ $json.cart_data }}",
+            "sender_id": "={{ $json.sender_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ai_json",
+              "displayName": "ai_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1632,
+        1232
+      ],
+      "id": "46a45da4-476c-4807-b2de-79fce24cc25f",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\"recipient\": {\n\"id\": \"={{ $json.sender_id }}\"\n},\n\"message\": {\n\"text\": \"={{ '✅ ' + $('Modify Cart Data').first().json.product_name + ' (၁) ခုကို ခြင်းတောင်းထဲ ထည့်လိုက်ပါပြီရှင်။ အရေအတွက် ဘယ်လောက်ယူမလဲရှင်။' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1856,
+        1216
+      ],
+      "id": "ec403ca8-6e92-4967-86ae-6e584d2b318c",
+      "name": "Ask for quantity",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ၁။ ပထမဆုံး Webhook မှ ဝင်လာသော Data ကို ယူခြင်း\nconst webhookData = $('Facebook Webhook').first().json.body.entry[0].messaging[0];\nconst payload = webhookData.postback?.payload || webhookData.message?.text || \"\";\nconst senderId = webhookData.sender.id;\n\n// ၂။ BUY_ နောက်က ပစ္စည်းနာမည်ကို ဖြတ်ယူခြင်း\nconst productName = payload.replace(\"BUY_\", \"\").trim();\n\n// ၃။ Get Row(s) မှ ရလာသော ခြင်းတောင်းအဟောင်းကို ယူခြင်း \nconst items = $input.all(); \nconst dbData = items.length > 0 && Object.keys(items[0].json).length > 0 ? items[0].json : null;\n\nlet cart = [];\n\n// Customer အဟောင်းဖြစ်ပြီး ai_json ရှိနေမှသာ ခြင်းတောင်းကို ဆွဲထုတ်မည်\nif (dbData && dbData.ai_json) {\n    try {\n        cart = JSON.parse(dbData.ai_json);\n    } catch(e) {}\n}\n\n// ၄။ ခြင်းတောင်းထဲသို့ ရွေးလိုက်သော ပစ္စည်း (၁) ခု ထည့်ခြင်း\nconst existingIndex = cart.findIndex(item => item.product_name === productName);\nif (existingIndex > -1) {\n    cart[existingIndex].quantity += 1; // ပါပြီးသားဆိုလျှင် ၁ ခု တိုးမည်\n} else {\n    cart.push({ product_name: productName, quantity: 1 }); // မပါသေးလျှင် အသစ်ထည့်မည်\n}\n\n// ၅. Upsert အတွက် Data ပြန်ထုတ်ပေးခြင်း\nreturn [{\n    json: {\n        sender_id: senderId,\n        product_name: productName,\n        cart_data: JSON.stringify(cart)\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        1232
+      ],
+      "id": "282555a3-f9c7-41bb-ac23-4f7d86dac90e",
+      "name": "Modify Cart Data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fb-verify": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Messaging Event?": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Sales Agent": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Payment Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge FB Event": {
+      "main": [
+        [
+          {
+            "node": "Has Messaging Event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Customer Image Early": {
+      "main": [
+        [
+          {
+            "node": "Convert to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Image Path": {
+      "main": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Image": {
+      "main": [
+        [
+          {
+            "node": "Download Customer Image Early",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Image Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin handover": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send Facebook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Greeting?": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Menu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Webhook": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge FB Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "show_product_carousel": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Get All Products": {
+      "main": [
+        [
+          {
+            "node": "Prepare Product Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Identify Product from Image": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Identification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Product Catalog": {
+      "main": [
+        [
+          {
+            "node": "AI Identify Product from Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Identification Result": {
+      "main": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Base64": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Get All Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_price_and_info": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_cart_db": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Sales Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Checkout Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get ViewCart Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Browse Products Msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Greeting?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Checkout Data": {
+      "main": [
+        [
+          {
+            "node": "Build Checkout Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Checkout Link": {
+      "main": [
+        [
+          {
+            "node": "Send Checkout Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build ViewCart Data": {
+      "main": [
+        [
+          {
+            "node": "Send ViewCart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get ViewCart Data": {
+      "main": [
+        [
+          {
+            "node": "Build ViewCart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Browse Products Msg": {
+      "main": [
+        [
+          {
+            "node": "Send Browse Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Modify Cart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Ask for quantity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modify Cart Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6868f183-7874-485a-a012-571e98efa0e2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "eGhTWyDSySnMmnt3",
+  "tags": []
+}
