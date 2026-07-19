@@ -1,2 +1,2 @@
 # ai-sales-agent-portfolio
-AI Sales Agent
+Infinity Tech AI-Powered Facebook Messenger Sales Agent
