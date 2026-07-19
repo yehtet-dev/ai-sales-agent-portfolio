@@ -1,0 +1,399 @@
+{
+  "name": "Cosmetics - Telegram Admin Response Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "3a1bd491-ea7d-448b-aac7-a6164b3e6242",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        240
+      ],
+      "webhookId": "d5b5b97c-d522-4dce-8d45-09f753155d52",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "is-admin",
+              "leftValue": "={{ $json.message.from.id }}",
+              "rightValue": "5452598419",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "6a98314d-b4ec-4f3d-a2c5-bd65e4e93b0f",
+      "name": "Is Admin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse admin's reply message and determine command type\nconst message = $input.first().json.message;\nconst text = (message.text || '').trim().toLowerCase();\nconst replyTo = message.reply_to_message;\n\nlet commandType = 'unknown'; \nlet status = 'unknown';\nlet customerSenderId = '';\nlet resumeUrl = ''; \nlet items = []; // Changed to an array to hold multiple products\n\nif (replyTo && replyTo.text) {\n  const originalText = replyTo.text;\n  \n  if (originalText.includes('Payment Verification') || originalText.includes('Admin Confirmation Required')) {\n    commandType = 'payment_confirmation';\n  } else if (originalText.includes('New Multi-Item Order') || originalText.includes('New Order Request')) {\n    commandType = 'inventory_approval';\n  }\n  \n  // Extract Customer FB ID\n  const fbIdMatch = originalText.match(/FB ID:\\s*(\\d+)/) || originalText.match(/Customer FB ID:\\s*(\\S+)/);\n  if (fbIdMatch) customerSenderId = fbIdMatch[1].replace('💡', '').trim(); \n  \n  // 🎯 Parse Multiple Items (Matches \"1. Product Name \\n • Qty: 10\")\n  const itemRegex = /\\d+\\.\\s+(.+?)\\n\\s*•\\s*Qty:\\s*(\\d+)/g;\n  let match;\n  while ((match = itemRegex.exec(originalText)) !== null) {\n    items.push({\n      product_name: match[1].trim(),\n      requested_qty: parseInt(match[2], 10),\n      approved_qty: parseInt(match[2], 10) // Defaults to requested amount\n    });\n  }\n\n  // Fallback just in case an older single-item format comes through\n  if (items.length === 0) {\n    const productMatch = originalText.match(/Product:\\s*(.+)/);\n    const qtyMatch = originalText.match(/Requested Quantity:\\s*(\\d+)/);\n    if (productMatch && qtyMatch) {\n      items.push({\n        product_name: productMatch[1].trim(),\n        requested_qty: parseInt(qtyMatch[1], 10),\n        approved_qty: parseInt(qtyMatch[1], 10)\n      });\n    }\n  }\n\n  // Extract the unique n8n resume URL\n  const refMatch = originalText.match(/SystemRef:\\s*(https?:\\/\\/[^\\s]+)/);\n  if (refMatch) resumeUrl = refMatch[1].trim();\n}\n\n// Parse admin command\nif (commandType === 'inventory_approval') {\n  if (text.startsWith('approve')) {\n    status = 'approved';\n    \n    // Check if admin provided specific comma/space separated quantities\n    const args = text.replace('approve', '').trim();\n    if (args) {\n      const customQtys = args.match(/\\d+/g); // Extracts all numbers from the reply\n      if (customQtys) {\n        // Map the custom quantities back to the parsed items array\n        items = items.map((item, index) => {\n          if (customQtys[index] !== undefined) {\n            item.approved_qty = parseInt(customQtys[index], 10);\n          }\n          return item;\n        });\n      }\n    }\n  } else if (text.startsWith('reject')) {\n    status = 'rejected';\n    items = items.map(i => ({ ...i, approved_qty: 0 })); // Zero out all quantities\n  }\n} else if (commandType === 'payment_confirmation') {\n  if (text.startsWith('confirm') || text === 'yes' || text === 'ok') {\n    status = 'confirm';\n  } else if (text.startsWith('fail') || text.startsWith('reject') || text === 'no') {\n    status = 'fail';\n  }\n}\n\n// Return properly wrapped array\nreturn [{\n  json: {\n    command_type: commandType,\n    status: status,\n    approved_items: items, // Sending the full array of objects\n    customer_sender_id: customerSenderId,\n    admin_message: message.text,\n    admin_user_id: message.from.id,\n    resumeUrl: resumeUrl\n  }\n}];"
+      },
+      "id": "8322371b-670c-4d08-9904-89ac0b4fe559",
+      "name": "Parse Admin Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "valid-command",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "unknown",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "78ad7210-f9b5-464c-aeaa-8f61debf4722",
+      "name": "Valid Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        416,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "inventory_approval",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e0467fed-f646-4e46-b642-b53c17ab13de"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Inventory Approval"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command_type }}",
+                    "rightValue": "payment_confirmation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2cdae821-a603-4db6-84e7-28a3d51c6250"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Payment Confirmation"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "29bd1280-9302-4322-a8fe-4ca44662ee64",
+      "name": "Route by Command Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        640,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "=POST",
+        "url": "={{ $json.resumeUrl }}\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"{{ $json.status }}\",\n  \"approved_items\": {{ JSON.stringify($json.approved_items) }},\n  \"admin_user_id\": {{ $json.admin_user_id }},\n  \"customer_sender_id\": \"{{ $json.customer_sender_id }}\"\n}",
+        "options": {}
+      },
+      "id": "506efbda-91b2-4291-8dc0-19d143ac820a",
+      "name": "Resume Inventory Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.resumeUrl }}\n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"{{ $json.status }}\",\n  \"admin_user_id\": {{ $json.admin_user_id }},\n  \"customer_sender_id\": \"{{ $json.customer_sender_id }}\"\n}",
+        "options": {}
+      },
+      "id": "215f2c78-b2ee-4a69-85fe-b5a03b000f59",
+      "name": "Resume Payment Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        208
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "XVcui4GWPYakDCS6",
+          "name": "Telegram Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=5452598419",
+        "text": "={{ $json.command_type === 'inventory_approval' ? ($json.status === 'approved' ? '✅ Approved ' + $json.approved_quantity + ' units of ' + $json.product_name + '. Processing order...' : '❌ Rejected order for ' + $json.product_name + '.') : ($json.status === 'confirm' ? '✅ Payment confirmed. Creating order record...' : '❌ Payment rejected. Order will be marked as failed.') }}",
+        "additionalFields": {}
+      },
+      "id": "4816668d-9d98-43da-8743-d97bc1da4aa5",
+      "name": "Telegram - Confirm Action",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        352
+      ],
+      "webhookId": "740a2014-68ef-4428-aedb-54cd51a11782",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=5452598419",
+        "text": "❓ Invalid command. Please reply to a notification with:\n\n*For Order Approval:*\n• `approve <quantity>` - approve the order\n• `reject` - reject the order\n\n*For Payment Confirmation:*\n• `confirm` - payment is correct\n• `fail` - payment is invalid\n\nExamples:\n`approve 5`\n`reject`\n`confirm`\n`fail`",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "9b6ee9df-025d-4905-9455-924deb1803f0",
+      "name": "Telegram - Invalid Command",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        368
+      ],
+      "webhookId": "5e95f84a-5989-4224-9f41-9f11a853c9c3",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.from.id }}",
+        "text": "⛔ You are not authorized to manage orders.",
+        "additionalFields": {}
+      },
+      "id": "00059850-9e01-488f-97bd-595d366283ca",
+      "name": "Telegram - Unauthorized",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        352
+      ],
+      "webhookId": "acf6a6d1-db6e-4990-a17b-365e5b51425b",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is Admin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Admin?": {
+      "main": [
+        [
+          {
+            "node": "Parse Admin Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Admin Reply": {
+      "main": [
+        [
+          {
+            "node": "Valid Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Command?": {
+      "main": [
+        [
+          {
+            "node": "Route by Command Type",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram - Confirm Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Invalid Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Command Type": {
+      "main": [
+        [
+          {
+            "node": "Resume Inventory Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resume Payment Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8c381c91-0ed2-4fe6-a0a7-89caf88226a8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "UQwe2atAd8Olqw1X",
+  "tags": [
+    {
+      "updatedAt": "2026-05-17T14:29:31.203Z",
+      "createdAt": "2026-05-17T14:29:31.203Z",
+      "id": "4aePfBcHwrTZh4Ub",
+      "name": "telegram"
+    },
+    {
+      "updatedAt": "2026-05-11T05:35:07.677Z",
+      "createdAt": "2026-05-11T05:35:07.677Z",
+      "id": "F17MabEex1yBdwtk",
+      "name": "admin"
+    },
+    {
+      "updatedAt": "2026-05-10T12:34:57.555Z",
+      "createdAt": "2026-05-10T12:34:57.555Z",
+      "id": "bMW7Dj93CsUDf3tf",
+      "name": "cosmetics-ai-agent"
+    }
+  ]
+}

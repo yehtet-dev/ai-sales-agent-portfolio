@@ -1,0 +1,147 @@
+{
+  "name": "Admin Handover",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "5452598419",
+        "text": "=⚠️ <b>Admin Alert: Human Needed</b>\n\n👤 <b>Customer:</b> {{ $json.customer_name || $json.query.customer_name }}\n💬 <b>Message:</b> \"{{ $json.customer_query || $json.query.customer_query }}\"\n🛠️ <b>Reason:</b> {{ $json.reason || \"No special\" }}\n\n🔗 <a href=\"https://business.facebook.com/latest/inbox/thread/{{ $json.sender_id ||$json.query.sender_id }}\">Open Messenger Inbox</a> {{ $json.customer_name || $json.query.customer_name }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        16
+      ],
+      "id": "abdfbb08-b04a-454e-b021-9245f54a0574",
+      "name": "Send a text message",
+      "webhookId": "0b2da178-4467-4364-81ae-879e7920d0c1",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        16
+      ],
+      "id": "bb2ef92e-29d4-4828-8de0-8109a1b41aab",
+      "name": "Admin Handover"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/me/pass_thread_control",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Admin Handover').item.json.query.sender_id }}\"\n  },\n  \"target_app_id\": 263902037430900,\n  \"metadata\": \"Customer needs human help - unknown intent\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0f8636e5-da0b-46de-a707-2a54e8a2ba5b",
+      "name": "Pass Thread Control",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "= {\n  \"recipient\": {\n    \"id\": \"{{ $('Admin Handover').item.json.query.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": \"Admin ကိုအကြောင်းကြားထားပါတယ်ရှင်။ မကြာခင်ဆက်သွယ်လာပါလိမ့်မယ်။\"\n}\n}",
+        "options": {}
+      },
+      "id": "85d4e014-3e3a-440d-bf7b-2c6506cc30e1",
+      "name": "Send Facebook Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        16
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Send Facebook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin Handover": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Facebook Response": {
+      "main": [
+        [
+          {
+            "node": "Pass Thread Control",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4493a21f-347e-4adb-af82-a345a3186a61",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "B4OtYMVQAkrCu9Ng",
+  "tags": []
+}

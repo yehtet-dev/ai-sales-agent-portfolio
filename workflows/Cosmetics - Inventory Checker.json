@@ -1,0 +1,1134 @@
+{
+  "name": "Cosmetics - Inventory Checker",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"action\": \"order\",\n  \"customer_name\": \"={{ $json.Name }}\",\n  \"customer_phone\": \"={{ $json['Phone Number'] }}\",\n  \"customer_address\": \"={{ $json.Address }}\",\n  \"payment_method\": \"={{ $json['Payment Method'] }}\",\n  \"sender_id\": \"={{ $json.query.sender_id }}\",\n  \"cart_summary\": \"={{ $json.query.cart_summary }}\"\n}"
+      },
+      "id": "716a06a4-6334-4d7b-906b-1f12af979b37",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        2976,
+        2720
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "product-found",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "9715e016-e2a0-4e33-9da5-899467c02c66",
+      "name": "Product Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3952,
+        2832
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    status: 'not_found',\n    message: 'ဒီပစ္စည်းက လက်ကျန်မရှိတော့ပါဘူးရှင်။',\n    product_name: $('Parse Input Data').first().json.product_name\n  }\n}];"
+      },
+      "id": "b263057a-3833-436f-bb2a-e3f5a1c881db",
+      "name": "Product Not Found Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        2960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// အဝင် Data အားလုံးကို ယူမည် (.first() အစား .all() ကို သုံးသည်)\nconst allProducts = $input.all();\nconst allParsedData = $('Parse Input Data').all();\n\n// Item တစ်ခုချင်းစီတိုင်းအတွက် အလုပ်လုပ်ပေးရန် .map() ဖြင့် Loop ပတ်မည်\nconst output = allProducts.map((item, index) => {\n    const product = item.json;\n    \n    // အဝင် Product နဲ့ ၎င်းရဲ့ မူလ Parse လုပ်ထားတဲ့ Data ကို Index တူညီစွာဖြင့် တွဲပေးမည်\n    const parsedData = allParsedData[index] ? allParsedData[index].json : $('Parse Input Data').first().json;\n    \n    const requestedQty = parseInt(parsedData.quantity) || 1;\n    const instock = parseInt(product['Instock']) || 0;\n\n    // Price tiers from Google Sheets\n    const price1 = parseFloat(product['Price_Retail']) || 0;\n    const price2 = parseFloat(product['Price_Wholesale']) || 0;\n    const price3 = parseFloat(product['Price_Bulk']) || 0;\n    const price4 = parseFloat(product['Price_SuperBulk']) || 0;\n    const qty_tier2 = parseInt(product['Qty_Tier2']) || 5;\n    const qty_tier3 = parseInt(product['Qty_Tier3']) || 20;\n    const qty_tier4 = parseInt(product['Qty_Tier4']) || 0;\n\n    // Determine price based on quantity (check highest tier first)\n    let unitPrice = price1;\n    let priceTier = 'Retail';\n    if (qty_tier4 > 0 && price4 > 0 && requestedQty >= qty_tier4) {\n        unitPrice = price4;\n        priceTier = 'SuperBulk';\n    } else if (requestedQty >= qty_tier3) {\n        unitPrice = price3;\n        priceTier = 'Bulk';\n    } else if (requestedQty >= qty_tier2) {\n        unitPrice = price2;\n        priceTier = 'Wholesale';\n    }\n\n    const totalPrice = unitPrice * requestedQty;\n\n    // Item တစ်ခုချင်းစီအတွက် JSON Format ဖြင့် ပြန်ထုတ်ပေးမည်\n    return {\n        json: {\n            product_name: product['Product Name'],\n            product_image: product['Product Image URL'] || '',\n            requested_quantity: requestedQty,\n            instock: instock,\n            unit_price: unitPrice,\n            price_tier: priceTier,\n            total_price: totalPrice,\n            price_retail: price1,\n            price_wholesale: price2,\n            price_bulk: price3,\n            price_superbulk: price4,\n            qty_tier2: qty_tier2,\n            qty_tier3: qty_tier3,\n            qty_tier4: qty_tier4,\n            sender_id: parsedData.sender_id || '',\n            action: parsedData.action || 'check',\n            customer_name: parsedData.customer_name,\n            customer_phone: parsedData.customer_phone,\n            customer_address: parsedData.customer_address,\n            payment_method: parsedData.payment_method\n        }\n    };\n});\n\n// Item အားလုံးပါဝင်သော Array ကြီးကို အပြီးသတ် ပြန်ထုတ်ပေးမည်\nreturn output;"
+      },
+      "id": "387a4310-bcb3-4fa9-8d59-d1ff0e011f16",
+      "name": "Process Product Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4176,
+        2784
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "=5452598419",
+        "text": "=={{ $json.summary_message }}\n\nSystemRef: {{ $execution.resumeUrl }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b77aab67-1246-4851-9bec-ae3abc09ad38",
+      "name": "Telegram - Notify Admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6400,
+        2816
+      ],
+      "webhookId": "652a7594-042d-46cf-a14a-d19d87af9163",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Grab the Telegram response (which is the current input)\nconst telegramResponse = $input.first().json;\n\n// 2. We only need to store the message ID to track the Wait node\nreturn [{\n  json: {\n    telegram_message_id: telegramResponse.message_id,\n    order_status: 'pending_admin_approval',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "a803333d-50d4-4415-aa0c-5ab1d743bb53",
+      "name": "Store Pending Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6672,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {
+          "webhookSuffix": ""
+        }
+      },
+      "id": "16964678-5681-45f9-b01d-00ba92ff6895",
+      "name": "Wait for Admin Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6896,
+        2992
+      ],
+      "webhookId": "86b7b43d-e322-42fd-a544-936f1e1fa809"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Webhook ကနေ Admin ရဲ့ အတည်ပြုချက်ကို ယူခြင်း (body ထဲက data များကို ယူပါသည်)\nconst webhookData = $input.first().json.body || $input.first().json;\nconst isApproved = webhookData.status === 'approved';\n\n// Telegram မပို့ခင် သိမ်းထားခဲ့တဲ့ Order Summary ထဲက မူလပစ္စည်းအားလုံးကို ပြန်ယူခြင်း\nconst summaryData = $('Build Order Summary').first().json;\nconst originalItems = summaryData.all_items;\n\n// Admin ငြင်းပယ်လိုက်လျှင်\nif (!isApproved) {\n    return [{\n        json: {\n            status: 'rejected',\n            message: `ဝမ်းနည်းပါတယ်။ လက်ရှိမှာ ပစ္စည်းအချို့ လက်ကျန်မရှိတော့တဲ့အတွက် အော်ဒါကို ပယ်ဖျက်လိုက်ရပါတယ်ရှင်။`,\n            sender_id: summaryData.sender_id\n        }\n    }];\n}\n\n// Telegram မှ ပြန်ဝင်လာသော အတည်ပြုထားသည့် ပစ္စည်းစာရင်း (Array)\nconst approvedItemsArray = webhookData.approved_items || [];\n\nlet finalCustomerMessage = `လူကြီးမင်းမှာယူထားသော ပစ္စည်းများအားလုံး အတည်ပြု (Confirm) လိုက်ပါပြီရှင်။ 🎉\\n\\n📌 အော်ဒါအနှစ်ချုပ်:\\n`;\nlet grandTotal = 0;\nconst itemsToProcess = [];\n\n// မူလမှာထားတဲ့ ပစ္စည်းတစ်ခုချင်းစီကို Admin အတည်ပြုတဲ့ အရေအတွက်နဲ့ တိုက်စစ်ခြင်း\noriginalItems.forEach((origItem) => {\n    // Admin ပြန်ပို့လိုက်တဲ့ အထဲမှာ ဒီပစ္စည်း ပါ/မပါ ရှာမည်\n    const matchedAdminItem = approvedItemsArray.find(i => i.product_name === origItem.product_name);\n    \n    // Admin ဆီက approved_qty ပါလာရင် အဲဒါကိုသုံးမည်၊ မပါလာရင် မူလမှာထားတဲ့ requested_quantity ကိုပဲ သုံးမည်\n    let finalQty = origItem.requested_quantity; \n    if (matchedAdminItem && matchedAdminItem.approved_qty !== undefined) {\n        finalQty = matchedAdminItem.approved_qty;\n    }\n\n    // အတည်ပြုအရေအတွက် 0 ထက်ကြီးမှသာ အော်ဒါအဖြစ် ဆက်လက်ဆောင်ရွက်မည်\n    if (finalQty > 0) {\n        // ကျသင့်ငွေကို အတည်ပြု အရေအတွက် အသစ်ဖြင့် ပြန်တွက်မည်\n        const newTotalPrice = (parseFloat(origItem.unit_price) || 0) * finalQty;\n        grandTotal += newTotalPrice;\n\n        finalCustomerMessage += `• ${origItem.product_name} (${finalQty} ခု) - ${newTotalPrice} ကျပ်\\n`;\n\n        itemsToProcess.push({\n            product_name: origItem.product_name,\n            approved_qty: finalQty,\n            new_stock: origItem.instock - finalQty, // လက်ကျန်အသစ်ကို approved_qty ဖြင့် နှုတ်သည်\n            unit_price: origItem.unit_price\n        });\n    }\n});\n\n// Admin က အရေအတွက်တွေကို သုည(0) ပြောင်းလိုက်လို့ ပစ္စည်းတစ်ခုမှ မကျန်တော့ရင် Reject လုပ်မည်\nif (itemsToProcess.length === 0) {\n     return [{\n        json: {\n            status: 'rejected',\n            message: `ဝမ်းနည်းပါတယ်။ လက်ရှိမှာ ပစ္စည်းအချို့ လက်ကျန်မရှိတော့တဲ့အတွက် အော်ဒါကို ပယ်ဖျက်လိုက်ရပါတယ်ရှင်။`,\n            sender_id: summaryData.sender_id\n        }\n    }];\n}\n\n// -------------------------------------------------------------\n// Customer ရွေးချယ်ခဲ့တဲ့ Payment Method ကို စစ်ဆေးခြင်း\n// -------------------------------------------------------------\nconst paymentMethod = summaryData.payment_method || \"\";\nlet accountInfo = \"\";\nif (paymentMethod.includes(\"KBZ\") || paymentMethod.includes(\"Kpay\")) {\n    accountInfo = \"🏦 KBZ Pay\\n👤 အမည်: Ei Maung\\n📞 အကောင့်: 091234567\";\n} else if (paymentMethod.includes(\"Wave\")) {\n    accountInfo = \"🌊 Wave Pay\\n👤 အမည်: Ei Maung\\n📞 အကောင့်: 091234567\";\n} else if (paymentMethod.includes(\"CB\")) {\n    accountInfo = \"🏦 CB Pay\\n👤 အမည်: Ei Maung\\n📞 အကောင့်: 091234567\";\n} else {\n    accountInfo = \"🏦 KBZ / CB / Wave Pay\\n👤 အမည်: Ei Maung\\n📞 အကောင့်: 091234567\";\n}\n\nfinalCustomerMessage += `\\n💰 စုစုပေါင်း ကျသင့်ငွေ: ${grandTotal} ကျပ်\\n\\nလူကြီးမင်းရွေးချယ်ထားသော ငွေပေးချေမှုစနစ်အတွက် အောက်ပါအကောင့်သို့ လွှဲပေးနိုင်ပါတယ်ရှင်။\\n\\n${accountInfo}\\n\\nငွေလွှဲပြီးပါက ငွေလွှဲပြေစာ (Screenshot) လေး ပေးပို့ပေးပါရှင်။`;\n\n// -------------------------------------------------------------\n// Google Sheet ကို Update လုပ်ဖို့အတွက် Item တစ်ခုချင်းစီကို ပြန်ဖြန့်ထုတ်ခြင်း (Map)\n// -------------------------------------------------------------\nreturn itemsToProcess.map(item => ({\n    json: {\n        status: 'approved',\n        product_name: item.product_name,\n        new_stock: item.new_stock, // တွက်ထားပြီးသား လက်ကျန်အသစ်ကို ပို့ပေးမည်\n        customer_message: finalCustomerMessage,\n        sender_id: summaryData.sender_id\n    }\n}));"
+      },
+      "id": "95e05b11-136d-4712-9d12-ae4169d958d4",
+      "name": "Process Admin Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7104,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "approved-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a72acf0-736d-415e-91e8-7ca8b9ef8dd0",
+      "name": "Admin Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        7328,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "=1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 643198829
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Product Name": "={{ $json.product_name }}",
+            "Instock": "={{ $json.new_stock }}"
+          },
+          "matchingColumns": [
+            "Product Name"
+          ],
+          "schema": [
+            {
+              "id": "Product Name",
+              "displayName": "Product Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Product Image URL",
+              "displayName": "Product Image URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price_Retail",
+              "displayName": "Price_Retail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price_Wholesale",
+              "displayName": "Price_Wholesale",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price_Bulk",
+              "displayName": "Price_Bulk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price_SuperBulk",
+              "displayName": "Price_SuperBulk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Qty_Tier2",
+              "displayName": "Qty_Tier2",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Qty_Tier3",
+              "displayName": "Qty_Tier3",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Qty_Tier4",
+              "displayName": "Qty_Tier4",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Instock",
+              "displayName": "Instock",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c5f44dd4-68d4-4e20-8d8e-45ad4954b029",
+      "name": "Google Sheets - Update Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        7536,
+        2832
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GTOnKzQi6CDRzrHA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ၁။ Trigger မှ Customer Data များကို ယူခြင်း\nconst orderData = $('Execute Workflow Trigger').first().json;\n\n// ၂။ ရှေ့က Get Row မှ Database ထဲရှိ ခြင်းတောင်းအစစ်ကို ဆွဲထုတ်ခြင်း \nconst dbData = $('Extract Cart Items').first().json;\n\nlet cartItems = [];\ntry {\n    cartItems = JSON.parse(dbData.ai_json); // JSON ကို စနစ်တကျ ပြန်ဖြည်ခြင်း\n} catch(e) {}\n\n// ၃။ Final Order Sheet တွင် သိမ်းရန် သပ်ရပ်သော စာသားအဖြစ် ပြန်စီခြင်း (Summary)\nlet formattedOrderString = cartItems.map(item => {\n    return `${item.product_name} (${item.quantity} ခု)`;\n}).join('\\n');\n\n// ၄။ 🌟 ပစ္စည်းတစ်ခုချင်းစီအတွက် Google Sheets တွင် ရှာနိုင်ရန် Data များကို ခွဲထုတ်ခြင်း 🌟\nlet outputItems = cartItems.map(item => {\n    return {\n        json: {\n            customer_name: orderData.customer_name,\n            customer_phone: orderData.customer_phone,\n            customer_address: orderData.customer_address,\n            payment_method: orderData.payment_method,\n            sender_id: orderData.sender_id,\n            cart_summary: formattedOrderString, \n            total_items: cartItems.length,\n            // အောက်ပါ ၂ ကြောင်းကို ထပ်တိုးလိုက်ခြင်းဖြင့် Sheets Node မှ အလွယ်တကူ ရှာဖွေနိုင်ပါမည်\n            product_name: item.product_name,\n            quantity: item.quantity\n        }\n    };\n});\n\n// အကယ်၍ ခြင်းတောင်းအလွတ် ဖြစ်နေခဲ့လျှင်\nif (outputItems.length === 0) {\n    return [{\n        json: {\n            customer_name: orderData.customer_name,\n            sender_id: orderData.sender_id,\n            cart_summary: \"Empty Cart\",\n            product_name: \"\",\n            quantity: 0\n        }\n    }];\n}\n\n// ခွဲထုတ်ထားသော ပစ္စည်းစာရင်းကို နောက် Node သို့ ပို့ပေးခြင်း\nreturn outputItems;"
+      },
+      "id": "5d95e3b3-221c-408e-a97c-1bfe8fabbf8c",
+      "name": "Parse Input Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        2704
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "is-order",
+              "leftValue": "={{ $('Execute Workflow Trigger').item.json.action  }}",
+              "rightValue": "order",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "14f79b81-b840-494a-a06e-bd7069d3698c",
+      "name": "Is Order Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4288,
+        2560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return product info without triggering order/admin approval\nconst data = $input.first().json;\n\n// Hardcoded Burmese response for the Product Info stage\nconst productResponse = `${data.product_name} ပစ္စည်းရှိပါတယ်ရှင်။\n\nစျေးနှုန်းများမှာ -\n• လက်လီစျေး: ${data.price_retail} MMK\n• လက်ကားစျေး (${data.qty_tier2} ခုနှင့်အထက်): ${data.price_wholesale} MMK\n• အများစျေး (${data.qty_tier3} ခုနှင့်အထက်): ${data.price_bulk} MMK\nဖြစ်ပါတယ်ရှင်။\n\nဒီပစ္စည်းကို မှာချင်ပါသလားရှင်?`;\n\nreturn [{\n  json: {\n    status: 'product_info',\n    product_name: data.product_name,\n    product_image: data.product_image || '',\n    unit_price: data.unit_price,\n    price_tier: data.price_tier,\n    total_price: data.total_price,\n    message: productResponse // AI will repeat this exactly\n  }\n}];"
+      },
+      "id": "80f34532-b041-48fc-aae7-42336657f1fa",
+      "name": "Return Product Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4624,
+        2544
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "=1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 643198829,
+          "mode": "list",
+          "cachedResultName": "inventory",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Product Name",
+              "lookupValue": "={{ $json.product_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "67a5c226-3813-4ff4-811d-7a51d2d371a3",
+      "name": "Google Sheets - Lookup Product",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3696,
+        2752
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GTOnKzQi6CDRzrHA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\n\n// လမ်းကြောင်းသစ် (Switch) ကလာတဲ့ Data ရော၊ အဟောင်းကလာတဲ့ Data ကိုပါ အလိုအလျောက် နားလည်အောင် ရေးထားခြင်း\nconst items = inputData.available_items || inputData.data || $input.all().map(i => i.json);\n\nif (!items || items.length === 0) {\n    return [{ json: { error: \"No items found to build summary.\" } }];\n}\n\nlet finalMessage = \"==📦 <b>New Multi-Item Order</b>\\n\\n\";\nlet grandTotal = 0;\n\n// ပစ္စည်းတစ်ခုချင်းစီကို ဘေလ်ထဲ ထည့်ရေးခြင်း\nitems.forEach((item, index) => {\n    finalMessage += `<b>${index + 1}. ${item.product_name}</b>\\n`;\n    finalMessage += `• Qty: ${item.requested_quantity} | Stock: ${item.instock}\\n`;\n    finalMessage += `• Price: ${item.total_price} MMK\\n\\n`;\n    grandTotal += (parseFloat(item.total_price) || 0);\n});\n\n// Customer အချက်အလက်များ\nconst customer = items[0]; \nfinalMessage += `💰 <b>Grand Total: ${grandTotal} MMK</b>\\n\\n`;\nfinalMessage += `👤 <b>--- CUSTOMER DETAILS ---</b>\\n`;\nfinalMessage += `<b>Name:</b> ${customer.customer_name || 'N/A'}\\n`;\nfinalMessage += `<b>Phone:</b> ${customer.customer_phone || 'N/A'}\\n`;\nfinalMessage += `<b>Address:</b> ${customer.customer_address || 'N/A'}\\n`;\nfinalMessage += `<b>Payment:</b> ${customer.payment_method || 'N/A'}\\n`;\nfinalMessage += `<b>FB ID:</b> ${customer.sender_id || 'N/A'}\\n\\n`;\n\nfinalMessage += `💡 Reply with <code>approve</code> to confirm all items.`;\n\nreturn [{\n    json: {\n        summary_message: finalMessage,\n        grand_total: grandTotal,\n        sender_id: customer.sender_id,\n        payment_method: customer.payment_method,\n        all_items: items // နောက်ပိုင်း အသုံးပြုရန်\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6176,
+        2976
+      ],
+      "id": "658224d0-0a52-4f3b-bc4e-15f690e3ebb4",
+      "name": "Build Order Summary"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        7744,
+        2832
+      ],
+      "id": "975247d1-fbf3-4d1d-9b37-dd814a9c0ada",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Process Admin Response').first().json.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": {{ JSON.stringify($('Process Admin Response').first().json.customer_message) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        7968,
+        2992
+      ],
+      "id": "4ad66569-f2d1-455c-8f16-a6927c521527",
+      "name": "Send to Messenger",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"={{ $json.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": \"={{ $json.customer_message }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        7536,
+        3088
+      ],
+      "id": "ca9e0a16-eb75-409c-80c9-cd2d155419c8",
+      "name": "Send Rejection to Messenger",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {
+          "includeBinaries": false
+        }
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        4464,
+        2768
+      ],
+      "id": "c5bd1873-415b-453c-876d-5f9f11350982",
+      "name": "Aggregate2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate ကနေ စုစည်းထားတဲ့ ပစ္စည်းအားလုံးကို ယူပါမယ်\nconst items = $input.first().json.data || $input.all().map(i => i.json);\n\nlet totalItems = items.length;\nlet outOfStockCount = 0;\nlet availableItems = [];\nlet oosItems = [];\n\nitems.forEach(item => {\n    // လက်ကျန် 0 ဖြစ်နေသလား (သို့) တောင်းဆိုတဲ့ အရေအတွက်ထက် နည်းနေသလား စစ်ဆေးခြင်း\n    if (item.instock === 0) {\n        outOfStockCount++;\n        oosItems.push(item);\n    } else {\n        availableItems.push(item);\n    }\n});\n\nlet cartStatus = \"ALL_IN_STOCK\";\nif (outOfStockCount === totalItems) {\n    cartStatus = \"ALL_OOS\"; // အားလုံး ကုန်နေတယ်\n} else if (outOfStockCount > 0) {\n    cartStatus = \"PARTIAL_OOS\"; // တချို့ရှိပြီး တချို့ကုန်နေတယ်\n}\n\n// ... (အပေါ်က code တွေက အတူတူပါပဲ) ...\n\nreturn [{\n    json: {\n        cart_status: cartStatus,\n        total_items: totalItems,\n        oos_count: outOfStockCount,\n        available_items: availableItems,\n        oos_items: oosItems,\n        sender_id: items[0].sender_id,\n        // 👇 အောက်က (၄) ကြောင်းကို အသစ်ထပ်ဖြည့်လိုက်တာပါ\n        customer_name: items[0].customer_name || '',\n        customer_phone: items[0].customer_phone || '',\n        customer_address: items[0].customer_address || '',\n        payment_method: items[0].payment_method || ''\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4640,
+        2784
+      ],
+      "id": "5c89ab35-589e-41a8-b2ef-129c1a05f82e",
+      "name": "Evaluate Cart Status"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.cart_status }}",
+                    "rightValue": "ALL_OOS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "441ba86a-9b53-4983-b7b9-b88e11d36dc5"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "All Sold out"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8b55be28-9ab3-46bf-818d-0bc41bb19ccc",
+                    "leftValue": "={{ $json.cart_status }}",
+                    "rightValue": "PARTIAL_OOS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Partial Sold out"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f2fcf03b-24d5-4ffd-8612-3824d824f9e6",
+                    "leftValue": "={{ $json.cart_status }}",
+                    "rightValue": "ALL_IN_STOCK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "All In Stock"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        4848,
+        2784
+      ],
+      "id": "22d8f357-fc59-416a-bd46-fc796b5f3b43",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $json.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": \"ဝမ်းနည်းပါတယ်။ အောက်ပါပစ္စည်းများ လက်ကျန်မရှိတော့ပါ: [{{ $json.oos_items.map(i => i.product_name).join(', ') }}]။ \\n\\nရနိုင်သောပစ္စည်းများ: [{{ $json.available_items.map(i => i.product_name + ' (' + i.requested_quantity + ' ခု)').join(', ') }}]။ \\n\\nတခြားထဲကရော ကြည့်ဦးမလားရှင့် (သို) ရတဲ့ဟာပဲ ယူတော့မလားရှင့်။\",\n    \"quick_replies\": [\n      {\n        \"content_type\": \"text\",\n        \"title\": \"ဒါပဲယူမယ်\",\n        \"payload\": \"UPDATE_CART:{\\\"cart\\\":\\\"{{ $json.available_items.map(i => i.requested_quantity + 'x_' + i.product_name).join(',') }}\\\", \\\"name\\\":\\\"{{ $json.customer_name }}\\\", \\\"phone\\\":\\\"{{ $json.customer_phone }}\\\", \\\"address\\\":\\\"{{ $json.customer_address }}\\\", \\\"pay\\\":\\\"{{ $json.payment_method }}\\\"}\"\n      },\n      {\n        \"content_type\": \"text\",\n        \"title\": \"ဆက်ကြည့်မယ်\",\n        \"payload\": \"REPLACE_CART:{{ $json.available_items.map(i => i.requested_quantity + 'x_' + i.product_name).join(',') }}\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5120,
+        2944
+      ],
+      "id": "e941f14b-e24c-48b6-ac08-e6e6b2027768",
+      "name": "Send Partial Msg",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $json.sender_id }}\"\n  },\n  \"message\": {\n    \"text\": \"ဝမ်းနည်းပါတယ်။ လူကြီးမင်း ရွေးချယ်ထားသော ပစ္စည်းများအားလုံး လက်ရှိတွင် ကုန်ဆုံးနေပါတယ်ရှင် 😢 အခြားပစ္စည်း ဆက်ကြည့်ချင်သေးလားရှင့်။\",\n    \"quick_replies\": [\n      {\n        \"content_type\": \"text\",\n        \"title\": \"ဆက်ကြည့်မယ်\",\n        \"payload\": \"REPLACE_CART:EMPTY\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5184,
+        2736
+      ],
+      "id": "4130b67c-6693-4b71-9bc1-722c59472a84",
+      "name": "Send All Sold Out",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.sender_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3184,
+        2720
+      ],
+      "id": "7127ab3b-3a04-4ad0-a8f5-b576a7ffe1d9",
+      "name": "Extract Cart Items"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Gvlpm4H6ZoyWadTl",
+          "mode": "list",
+          "cachedResultName": "Pending Order",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/Gvlpm4H6ZoyWadTl"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.sender_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Customer_Phone": "={{ $json.all_items[0].customer_phone }}",
+            "Total_Price": "={{ $json.grand_total }}",
+            "Customer_Name": "={{ $json.all_items[0].customer_name }}",
+            "Customer_Address": "={{ $json.all_items[0].customer_address }}",
+            "cart_json": "={{ JSON.stringify($json.all_items) }}",
+            "Payment_Method": "={{ $json.payment_method }}",
+            "sender_id": "={{ $json.sender_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Order_ID",
+              "displayName": "Order_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Order_Date",
+              "displayName": "Order_Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Customer_Name",
+              "displayName": "Customer_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Customer_Phone",
+              "displayName": "Customer_Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Customer_Address",
+              "displayName": "Customer_Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "cart_json",
+              "displayName": "cart_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Total_Price",
+              "displayName": "Total_Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Payment_Method",
+              "displayName": "Payment_Method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6512,
+        3328
+      ],
+      "id": "96f05926-9a48-4215-a896-15e06206e565",
+      "name": "Pending Order Table"
+    }
+  ],
+  "pinData": {
+    "Execute Workflow Trigger": [
+      {
+        "json": {
+          "action": "order",
+          "customer_name": "Ye Htet Soe",
+          "customer_phone": "0979044444414",
+          "customer_address": "86th Street",
+          "payment_method": "Kpay",
+          "sender_id": "27571274165899350",
+          "cart_summary": "0 ([object Object] ခု)"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Cart Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Found?": {
+      "main": [
+        [
+          {
+            "node": "Process Product Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Product Not Found Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Product Data": {
+      "main": [
+        [
+          {
+            "node": "Is Order Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Store Pending Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Pending Order": {
+      "main": [
+        [
+          {
+            "node": "Wait for Admin Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Admin Approval": {
+      "main": [
+        [
+          {
+            "node": "Process Admin Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Admin Response": {
+      "main": [
+        [
+          {
+            "node": "Admin Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin Approved?": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Update Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Rejection to Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Update Stock": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Input Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Lookup Product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Order Request?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Product Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Lookup Product": {
+      "main": [
+        [
+          {
+            "node": "Product Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Order Summary": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Notify Admin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pending Order Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Send to Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate2": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Cart Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Cart Status": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send All Sold Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Partial Msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Order Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Cart Items": {
+      "main": [
+        [
+          {
+            "node": "Parse Input Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "947d5b13-247a-4cd0-bb13-6147d74364ee",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "jIitAf51qpSXllMy",
+  "tags": [
+    {
+      "updatedAt": "2026-05-10T15:01:14.721Z",
+      "createdAt": "2026-05-10T15:01:14.721Z",
+      "id": "aGXjqxnJHKZEZ9cU",
+      "name": "inventory"
+    },
+    {
+      "updatedAt": "2026-05-10T12:34:57.555Z",
+      "createdAt": "2026-05-10T12:34:57.555Z",
+      "id": "bMW7Dj93CsUDf3tf",
+      "name": "cosmetics-ai-agent"
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "name": "Checkout Form Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Guru - Order Checkout",
+        "formDescription": "=",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone Number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Address",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Payment Method",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Kpay"
+                  },
+                  {
+                    "option": "Wave"
+                  },
+                  {
+                    "option": "Cash on Delivery"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        560,
+        224
+      ],
+      "id": "a53fcdc1-8306-46aa-a6d4-f268cb06c700",
+      "name": "Order Checkout",
+      "webhookId": "1ddb3a2c-be96-4823-831e-6c8f794641ec"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "jIitAf51qpSXllMy",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jIitAf51qpSXllMy",
+          "cachedResultName": "Cosmetics - Inventory Checker"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_name": "={{ $json.Name }}",
+            "customer_phone": "={{ $json[\"Phone Number\"] }}",
+            "customer_address": "={{ $json.Address }}",
+            "payment_method": "={{ $json[\"Payment Method\"] }}",
+            "sender_id": "={{ $json.formQueryParameters.sender_id }}",
+            "cart_summary": "={{ $json.formQueryParameters.cart_summary }}",
+            "action": "order"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "customer_phone",
+              "displayName": "customer_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "customer_address",
+              "displayName": "customer_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "payment_method",
+              "displayName": "payment_method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "cart_summary",
+              "displayName": "cart_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        224
+      ],
+      "id": "81f96557-b33f-4729-a54c-1998b6b2d16a",
+      "name": "Call 'Cosmetics - Inventory Checker'",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Order Checkout": {
+      "main": [
+        [
+          {
+            "node": "Call 'Cosmetics - Inventory Checker'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "20200d17-bd81-4548-a6b1-9ff59e3bf056",
+  "meta": {
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "8e3sCdecbcbljgaD",
+  "tags": []
+}

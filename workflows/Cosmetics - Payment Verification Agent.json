@@ -1,0 +1,825 @@
+{
+  "name": "Cosmetics - Payment Verification Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "e635f2db-2643-4c7f-9db7-f8afd1bc4a4c",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -4992,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare payment verification data\nconst input = $input.first().json;\nconst cartJson = input.cart_json;\n\nlet productNames = '';\nlet orderSummary = '';\n\nif (cartJson) {\n  try {\n    // 1. JSON ကို ဖြည်မည် (Parse)\n    const cartData = JSON.parse(cartJson);\n\n    // 2. Product Name များကို ကော်မာခံ၍ တွဲမည်\n    productNames = cartData.map(item => item.product_name).join(', ');\n\n    // 3. Order Summary စာသားကို တည်ဆောက်မည် (ဥပမာ: \"• Snail White (x2)\")\n    orderSummary = cartData.map(item => {\n        const qty = parseInt(item.quantity) || 1;\n        return `• ${item.product_name} (x${qty})`;\n    }).join('\\n');\n\n\n  } catch (e) {\n    console.log(\"Error parsing cart_json\");\n  }\n}\nreturn [{\n  json: {\n    screenshot_url: $('Execute Workflow Trigger').first().json.screenshot_url || '',\n    expected_amount: parseFloat(input.Total_Price) || 0,\n    sender_id: input.sender_id || '',\n    customer_name: input.Customer_Name || '',\n    customer_phone: input.Customer_Phone || '',\n    customer_address: input.Customer_Address || '',\n    order_summary: orderSummary || '',\n    product_name: productNames || '',\n    total_price: parseFloat (input.Total_Price) || 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "87d99f99-7678-4588-9585-5987b8f0babf",
+      "name": "Prepare Verification Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4480,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please analyze this payment screenshot and extract the transaction details.\n\nPayment Screenshot URL: {{ $json.screenshot_url }}\nExpected Payment Amount: {{ $json.expected_amount }} MMK\n\nExtract and verify:\n1. Transaction ID / Reference Number\n2. Amount paid\n3. Sender account name\n4. Receiver account name\n5. Date and time of transaction\n6. Payment method (KBZ Pay, CB Pay, AYA Pay, Wave Pay, Bank Transfer)\n\nThen verify:\n- Does the amount match the expected amount of {{ $json.expected_amount }} MMK?\n- Is the receiver account name matching our business account?\n- Is the transaction date recent (within last 24 hours: compare with {{ $json.timestamp }}) ?\n\nProvide your analysis in a structured format.",
+        "options": {
+          "systemMessage": "You are a payment slip verifier for a Myanmar cosmetics business. Analyze the attached payment screenshot.\n\nEXTRACT from screenshot:\n- Transaction ID, Amount, Sender name, Receiver name, Transaction Date/time, Payment platform (KBZ/CB/AYA/Wave/Bank)\n\nVERIFY:\n- Amount must exactly match expected amount\n- Receiver must be Ei Maung (our account on KPay/Wave/AYA)\n- Transaction date must be within 24 hours\n\nRETURN only a JSON object:\n{\"verification_status\":\"VERIFIED or AMOUNT_MISMATCH or INVALID_RECEIVER or EXPIRED or UNREADABLE or SUSPICIOUS\",\"transaction_id\":\"\",\"amount_paid\":0,\"expected_amount\":0,\"sender_name\":\"\",\"receiver_name\":\"\",\"payment_method\":\"\",\"transaction_date\":\"\",\"notes\":\"\"}"
+        }
+      },
+      "id": "3dbe2cc4-1b2d-49c8-b9e6-b52bc64f7185",
+      "name": "AI Payment Verifier",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -3792,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI verification result\nconst aiOutput = $input.first().json.output;\nconst triggerData = $('Prepare Verification Data').first().json;\nlet verificationResult;\n\ntry {\n  const jsonMatch = aiOutput.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    verificationResult = JSON.parse(jsonMatch[0]);\n  } else {\n    verificationResult = {\n      verification_status: 'UNREADABLE',\n      notes: 'Could not parse verification result from AI',\n      raw_output: aiOutput\n    };\n  }\n} catch (e) {\n  verificationResult = {\n    verification_status: 'UNREADABLE',\n    notes: 'Error parsing AI response: ' + e.message,\n    raw_output: aiOutput\n  };\n}\n\n// Carry forward all order context\nverificationResult.customer_name = triggerData.customer_name;\nverificationResult.customer_phone = triggerData.customer_phone;\nverificationResult.customer_address = triggerData.customer_address;\nverificationResult.order_summary = triggerData.order_summary;\nverificationResult.sender_id = triggerData.sender_id;\nverificationResult.product_name = triggerData.product_name;\nverificationResult.product_image = triggerData.product_image;\nverificationResult.quantity = triggerData.quantity;\nverificationResult.unit_price = triggerData.unit_price;\nverificationResult.price_tier = triggerData.price_tier;\nverificationResult.total_price = triggerData.total_price;\nverificationResult.screenshot_url = triggerData.screenshot_url;\n\nreturn [{ json: verificationResult }];"
+      },
+      "id": "682b4f09-0280-4e85-948b-d9b20b484830",
+      "name": "Parse Verification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3504,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "5452598419",
+        "text": "=💳 *Payment Verification - Admin Confirmation Required*\n\n*Customer:* {{ $json.customer_name }}\n*Customer Phone:* {{ $json.customer_phone }}\n*Customer Fb ID* {{ $json.sender_id }}\n*Order:* {{ $json.order_summary }}\n*Product:* {{ $json.product_name }} \n*Total:* {{ $json.total_price }} MMK\n\n*AI Verification Status:* {{ $json.verification_status }}\n*Transaction ID:* {{ $json.transaction_id || 'N/A' }}\n*Amount Paid:* {{ $json.amount_paid || 'N/A' }} MMK\n*Expected Amount:* {{ $json.expected_amount || 'N/A' }} MMK\n*Payment Method:* {{ $json.payment_method || 'N/A' }}\n*Sender:* {{ $json.sender_name || 'N/A' }}\n*Receiver:* {{ $json.receiver_name || 'N/A' }}\n*Screenshot:* \n\n{{ $json.notes ? '📝 AI Notes: ' + $json.notes : '' }}\n\n💡 *Please confirm the payment:*\n• Reply `confirm` - Payment is correct, close order as SUCCESS\n• Reply `fail` - Payment is invalid, close order as FAILED\n\nSystemRef: {{ $execution.resumeUrl }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "d9b9daab-a9ed-4bc1-9167-773bad6da890",
+      "name": "Telegram - Forward to Admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -3296,
+        1136
+      ],
+      "webhookId": "91cc2fcc-3bbf-4116-a423-14b01e6c8079",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWlA69tHPNjJo4sH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store all data for retrieval when admin confirms\nconst verifyResult = $('Parse Verification Result').first().json;\nconst telegramMsg = $input.first().json;\n\nreturn [{\n  json: {\n    ...verifyResult,\n    telegram_message_id: telegramMsg.message_id,\n    awaiting_admin_payment_confirmation: true,\n    timestamp: new Date().toISOString(),\n    message:\"data received\"\n  }\n}];"
+      },
+      "id": "cffd7bfa-0aec-40cf-bc1a-0ff25ea6a1f3",
+      "name": "Store Pending Payment Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3072,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "incomingAuthentication": "basicAuth",
+        "httpMethod": "=POST",
+        "options": {
+          "webhookSuffix": ""
+        }
+      },
+      "id": "2583b28f-543a-404e-ab36-9e3253ddf346",
+      "name": "Wait for Admin Payment Confirmation",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2848,
+        1136
+      ],
+      "webhookId": "4b1d6f87-bce0-45fb-b970-7448e14374fc",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "cQ5w1fBHASP1p20Q",
+          "name": "Telegram Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhookData = $input.first().json;\nconst pendingData = $('Store Pending Payment Data').first().json;\n\nconst adminDecision = webhookData.body.status; \nconst orderStatus = adminDecision === 'confirm' ? 'success' : 'fail';\n\n// Give the AI a strict command based on the result\nlet instructionForAI = '';\nif (orderStatus === 'success') {\n  instructionForAI = \"CRITICAL COMMAND: Payment verified successfully! You MUST now call the 'close_order' tool using this data. DO NOT stop working. After the close_order tool finishes, you must show the customer the final receipt.\";\n} else {\n  instructionForAI = `CRITICAL COMMAND: Payment FAILED. The admin rejected it. You MUST immediately write a polite message in Burmese explaining that the payment could not be verified and ask the customer to resend the screenshot.`;\n}\n\nreturn [{\n  json: {\n    _AI_COMMAND_: instructionForAI, // The AI will read this first\n    order_status: orderStatus,\n    admin_confirmed: adminDecision === 'confirm',\n    customer_name: pendingData.customer_name,\n    customer_phone: pendingData.customer_phone,\n    customer_address: pendingData.customer_address,\n    sender_id: pendingData.sender_id,\n    product_name: pendingData.product_name,\n    product_image: pendingData.product_image,\n    quantity: pendingData.quantity,\n    unit_price: pendingData.unit_price,\n    price_tier: pendingData.price_tier,\n    total_price: pendingData.total_price,\n    payment_method: pendingData.payment_method || '',\n    transaction_id: pendingData.transaction_id || '',\n    payment_screenshot_url: pendingData.screenshot_url || '',\n    payment_status: orderStatus === 'success' ? 'confirmed' : 'rejected',\n    verification_status: pendingData.verification_status || ''\n  }\n}];"
+      },
+      "id": "46406d17-985f-4afb-b9c6-b1d2c18b1d88",
+      "name": "Process Admin Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2624,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -3856,
+        1344
+      ],
+      "id": "e497c2be-54c5-422d-9d26-3375426fa25e",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "8E72mgNgIIPFihIp",
+          "name": "Cosmetics"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b670d761-b432-4b85-a9e9-862f4b14f097",
+              "leftValue": "={{ $json.order_status }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2416,
+        1136
+      ],
+      "id": "d2b7653f-9c47-407a-8bb3-5efce3f2d617",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate unique Order ID and prepare order record\nconst input = $input.first().json;\nconst now = new Date();\nconst dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');\nconst timeStr = now.toISOString().slice(11, 19).replace(/:/g, '');\nconst randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();\nconst orderId = `ORD-${dateStr}-${timeStr}-${randomSuffix}`;\n\nreturn [{\n  json: {\n    order_id: orderId,\n    order_date: now.toISOString(),\n    order_status: input.order_status || 'success',\n    customer_name: input.customer_name || '',\n    customer_phone: input.customer_phone || '',\n    customer_address: input.customer_address || '',\n    customer_fb_id: input.sender_id || '',\n    product_name: input.product_name || '',\n    product_image: input.product_image || '',\n    quantity: parseInt(input.quantity) || 0,\n    unit_price: parseFloat(input.unit_price) || 0,\n    price_tier: input.price_tier || '',\n    total_price: parseFloat(input.total_price) || 0,\n    payment_method: input.payment_method || '',\n    transaction_id: input.transaction_id || '',\n    payment_screenshot_url: input.payment_screenshot_url || '',\n    payment_status: input.payment_status || '',\n    verification_status: input.verification_status || '',\n    admin_approved: input.admin_approved || false,\n    notes: input.notes || ''\n  }\n}];"
+      },
+      "id": "611bac5c-e335-4542-a0a7-f15f73b239ae",
+      "name": "Generate Order ID & Prepare Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2112,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1eY96lIjfUcXfiLnGLlAITTai5Vn3aLDjoN9Fkbonm04",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 763017813,
+          "mode": "list",
+          "cachedResultName": "Orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eY96lIjfUcXfiLnGLlAITTai5Vn3aLDjoN9Fkbonm04/edit#gid=763017813"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order ID": "={{ $json.order_id }}",
+            "Customer Name": "={{ $json.customer_name }}",
+            "Order Date": "={{ $json.order_date }}",
+            "Status": "={{ $json.order_status }}",
+            "Customer Phone": "={{ $json.customer_phone }}",
+            "Customer Address": "={{ $json.customer_address }}",
+            "Customer FB ID": "={{ $json.customer_fb_id }}",
+            "Product Name": "={{ $json.product_name }}",
+            "Product Image": "={{ $json.product_image }}",
+            "Quantity": "={{ $json.quantity }}",
+            "Unit Price": "={{ $json.unit_price }}",
+            "Price Tier": "={{ $json.price_tier }}",
+            "Total Price": "={{ $json.total_price }}",
+            "Transaction ID": "={{ $json.transaction_id }}",
+            "Payment Screenshot": "=",
+            "Payment Status": "={{ $json.payment_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Order ID",
+              "displayName": "Order ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Order Date",
+              "displayName": "Order Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Phone",
+              "displayName": "Customer Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Address",
+              "displayName": "Customer Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer FB ID",
+              "displayName": "Customer FB ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product Name",
+              "displayName": "Product Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product Image",
+              "displayName": "Product Image",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit Price",
+              "displayName": "Unit Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Price Tier",
+              "displayName": "Price Tier",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Price",
+              "displayName": "Total Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Method",
+              "displayName": "Payment Method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Transaction ID",
+              "displayName": "Transaction ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Screenshot",
+              "displayName": "Payment Screenshot",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Status",
+              "displayName": "Payment Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Verification Status",
+              "displayName": "Verification Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "02f262dc-209a-47e9-a9e3-122a74ad560a",
+      "name": "Google Sheets - Create Order Record",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1888,
+        960
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GTOnKzQi6CDRzrHA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Generate Order ID & Prepare Data').first().json;\n\n// Build a clean, simple confirmation message instead of a full receipt\nconst successMessage = `ငွေပေးချေမှု အောင်မြင်ပါသည်ရှင်။ အော်ဒါကို အတည်ပြု မှတ်သားထားပါတယ်ရှင်။ 🎉\n\nအားပေးမှုကို ကျေးဇူးအထူးတင်ရှိပါတယ်ရှင်။ ပစ္စည်းပို့မည့်ရက်ကို ထပ်မံအကြောင်းကြားပေးပါမည်။ 🙏`;\n\nreturn [{\n  json: {\n    sender_id: data.sender_id,\n    message: successMessage,\n    status: \"success\"\n  }\n}];"
+      },
+      "id": "2ab4adc5-e06e-4212-aa11-88817536461c",
+      "name": "Build Receipt Data for Sales Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1456,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst failText = `ဝမ်းနည်းပါတယ်။ လူကြီးမင်းလွှဲထားသော ငွေလွှဲပြေစာကို စစ်ဆေး၍မရသေးပါသဖြင့် မှန်ကန်သော Screenshot ကို ကျေးဇူးပြု၍ ပြန်လည်ပေးပို့ပေးပါ။\\n(အကြောင်းရင်း: ${data.verification_status || 'Admin Rejected'})`;\n\nreturn [{\n  json: {\n    sender_id: data.sender_id,\n    message: failText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1856,
+        1264
+      ],
+      "id": "02ba212b-5192-4e18-a8ad-38b5ac5a91b2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('If').item.json.sender_id || $json.sender_id}}\"\n  },\n  \"message\": {\n    \"text\": {{ JSON.stringify($json.message)}}\n  }\n}",
+        "options": {}
+      },
+      "id": "4495a23e-3a9c-4b74-857e-dc8396eddde2",
+      "name": "Send Facebook Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -976,
+        1056
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "lgZwqHYWCyZXVuSq",
+          "name": "AI Guru"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Gvlpm4H6ZoyWadTl",
+          "mode": "list",
+          "cachedResultName": "Pending Order",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/Gvlpm4H6ZoyWadTl"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.sender_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -4720,
+        1072
+      ],
+      "id": "8577637a-f5b8-478f-9f85-cc1e83a0f936",
+      "name": "Get row(s)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Gvlpm4H6ZoyWadTl",
+          "mode": "list",
+          "cachedResultName": "Pending Order",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/Gvlpm4H6ZoyWadTl"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json[\"Customer FB ID\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1328,
+        1168
+      ],
+      "id": "f5a152f9-5243-47b6-9ac9-7ddf0b873f30",
+      "name": "Delete row(s)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json[\"Customer FB ID\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1616,
+        1152
+      ],
+      "id": "969d4bc1-1e8d-4e0e-a06e-65f064a2c712",
+      "name": "Delete row(s)1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.screenshot_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "4d114ed0-4b43-49b9-b316-b2e5fa468ebe",
+      "name": "Download Customer Image Early",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4112,
+        1072
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {
+    "Execute Workflow Trigger": [
+      {
+        "json": {
+          "query": "PAYMENT_RECEIPT",
+          "sender_id": "27571274165899350",
+          "screenshot_url": "https://scontent.xx.fbcdn.net/v/t1.15752-9/684155586_1926287521345523_8244654004869899102_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=eb2e90&_nc_ohc=tAiXw9jZMAwQ7kNvwHBwr8D&_nc_oc=Adr85klNkRfXgJZiLx39_x0EqVHQjbrrkE6mZ3cJmzM3Uhxzu4a5Xfg0_LJoDaXGAA8qlqtD_Xhf_BE96v6riFcF&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.xx&oh=03_Q7cD5QHH1gGnKH7oPafZJN6NnaWzEpbLAqPVN8z7IqvPtMBHmA&oe=6A24100B"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Verification Data": {
+      "main": [
+        [
+          {
+            "node": "Download Customer Image Early",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Payment Verifier": {
+      "main": [
+        [
+          {
+            "node": "Parse Verification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Verification Result": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Forward to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Forward to Admin": {
+      "main": [
+        [
+          {
+            "node": "Store Pending Payment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Pending Payment Data": {
+      "main": [
+        [
+          {
+            "node": "Wait for Admin Payment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Admin Payment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Process Admin Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Payment Verifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Admin Confirmation": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Order ID & Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Create Order Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Create Order Record": {
+      "main": [
+        [
+          {
+            "node": "Build Receipt Data for Sales Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete row(s)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete row(s)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Generate Order ID & Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Receipt Data for Sales Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Facebook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send Facebook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Verification Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Customer Image Early": {
+      "main": [
+        [
+          {
+            "node": "AI Payment Verifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "db4a89a7-fc7c-4448-9641-a31af1fa9758",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "aeZNBnuYaXhhFehi",
+  "tags": [
+    {
+      "updatedAt": "2026-05-16T10:13:18.375Z",
+      "createdAt": "2026-05-16T10:13:18.375Z",
+      "id": "74D1BPLa7N9I4wn6",
+      "name": "payment"
+    },
+    {
+      "updatedAt": "2026-05-10T12:34:57.555Z",
+      "createdAt": "2026-05-10T12:34:57.555Z",
+      "id": "bMW7Dj93CsUDf3tf",
+      "name": "cosmetics-ai-agent"
+    }
+  ]
+}

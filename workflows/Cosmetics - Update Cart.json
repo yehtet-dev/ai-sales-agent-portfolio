@@ -1,0 +1,394 @@
+{
+  "name": "Cosmetics - Update Cart (Fixed Overwrite)",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $json.sender_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ai_json": "={{ $json.cart_data }}",
+            "sender_id": "={{ $json.sender_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sender_id",
+              "displayName": "sender_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ai_json",
+              "displayName": "ai_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        304,
+        432
+      ],
+      "id": "0cce6147-16ff-404c-8741-7fa4e3bd47e3",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n\"query\": {\n  \"sender_id\": \"1234567890\",\n  \"quantity\": 1,\n  \"keyword\": \"Snail\"\n}\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        544
+      ],
+      "id": "4e693b26-1efa-46e6-8fba-b4d2d8454d39",
+      "name": "Update Cart"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst triggerData = $('Update Cart').first().json.query;\nconst keyword = (triggerData.keyword || \"\").toLowerCase();\n\n// ၁။ Filter လုပ်မည့်အစား Code ဖြင့် တိုက်ရိုက် စစ်ထုတ်ခြင်း\nconst matchedItems = items.filter(item => {\n    const productName = (item.json['Product Name'] || \"\").toLowerCase();\n    const instock = parseInt(item.json['Instock']) || 0;\n    // နာမည်လည်းပါဝင်ရမည်၊ Stock လည်း > 0 ဖြစ်ရမည်\n    return productName.includes(keyword) && instock > 0;\n});\n\nconst count = matchedItems.length;\n\n// ၂။ ရလဒ်အပေါ်မူတည်၍ Status ခွဲထုတ်ခြင်း\nif (count === 0) {\n    return [{ json: { status: \"not_found\" } }];\n} else if (count === 1) {\n    return [{ json: { status: \"single_match\", product: matchedItems[0].json } }];\n} else {\n    let variationsText = \"\";\n    matchedItems.forEach((item, index) => {\n        variationsText += `${index + 1}. ${item.json['Product Name']} - ${item.json['Price_Retail']} Ks\\n`;\n    });\n    return [{ json: { status: \"multiple_matches\", variations_list: variationsText } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        544
+      ],
+      "id": "c06d81c8-03ff-4567-928e-b98880112e5d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "single_match",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "01f09f21-1099-41f3-b446-d4646ef8f400"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Single Match"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "9f373620-3ba6-4ab5-b7f1-c1e76e007e48",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "multiple_matches",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Multiple Matches"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "69e49ec0-3fea-480f-ad6a-63b2d97601ce",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "not_found",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Not Found"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -288,
+        544
+      ],
+      "id": "62c21d09-f1f6-4aef-a2fc-1ab98d14003d",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 643198829,
+          "mode": "list",
+          "cachedResultName": "inventory",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -912,
+        544
+      ],
+      "id": "575768e1-267d-4fca-99d3-5529e2934666",
+      "name": "Get All Products",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GTOnKzQi6CDRzrHA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. ရှေ့က Code (Single Match) မှ ပစ္စည်းနာမည်ကို ယူမည်\nconst exactProductName = $('Code in JavaScript').first().json.product['Product Name'];\n\n// 2. Trigger မှ Data များကို ယူမည်\nconst triggerData = $('Update Cart').first().json.query;\nconst qtyToAdd = parseInt(triggerData.quantity) || 1;\nconst senderId = triggerData.sender_id || triggerData.senderId;\n\n// 3. 🌟 အသစ်ထည့်လိုက်သော Database Node မှ လက်ရှိ Cart အဟောင်းကို ဆွဲယူမည် 🌟\nconst dbNode = $('Get Existing Cart').first();\nlet currentCartString = (dbNode && dbNode.json && dbNode.json.ai_json) ? dbNode.json.ai_json : \"[]\";\n\nlet cart = [];\ntry {\n    cart = JSON.parse(currentCartString);\n} catch(e) {}\n\n// 4. ပစ္စည်းအဟောင်းရှိမရှိ စစ်ဆေးပြီး ပေါင်းထည့်မည်\nconst existingItemIndex = cart.findIndex(item => item.product_name === exactProductName);\n\nif (existingItemIndex > -1) {\n    cart[existingItemIndex].quantity += qtyToAdd; // ပါပြီးသားဆို အရေအတွက်တိုးမည်\n} else {\n    cart.push({\n        product_name: exactProductName,\n        quantity: qtyToAdd // မပါသေးလျှင် အသစ်ထည့်မည်\n    });\n}\n\n// 5. Upsert သို့ ပို့ရန် ပြင်ဆင်မည်\nreturn [{\n    json: {\n        sender_id: senderId,\n        cart_data: JSON.stringify(cart),\n        final_product: exactProductName,\n        final_qty: qtyToAdd\n    }\n}];"
+      },
+      "id": "05708c7b-8d6d-4ec5-a1ff-139f6654287c",
+      "name": "Format Cart Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Cart Data ထဲမှ လက်ဆင့်ကမ်းလာသော နာမည်အမှန်နှင့် အရေအတွက်ကို ယူခြင်း\nconst finalProduct = $input.first().json.final_product || $('Format Cart Data').first().json.final_product;\nconst finalQty = $input.first().json.final_qty || $('Format Cart Data').first().json.final_qty;\n\nreturn [{\n    json: {\n        status: \"success\",\n        product_name: finalProduct,\n        quantity: finalQty\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        432
+      ],
+      "id": "2fe515b5-8a87-4b0d-b267-e814c8b3493a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        624
+      ],
+      "id": "d482216f-b8e3-4d78-a7dd-12bc3c6cdf53",
+      "name": "Return to AI"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "e8c3iavl1qFXOHWT",
+          "mode": "list",
+          "cachedResultName": "Active_Carts",
+          "cachedResultUrl": "/projects/IkzZmlATSVc0OhO0/datatables/e8c3iavl1qFXOHWT"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sender_id",
+              "keyValue": "={{ $('Update Cart').first().json.query.sender_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        432
+      ],
+      "id": "f61138e5-e930-4548-b0c7-f783c0641e32",
+      "name": "Get Existing Cart",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Update Cart": {
+      "main": [
+        [
+          {
+            "node": "Get All Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Products": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Cart",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return to AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return to AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Cart Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Cart": {
+      "main": [
+        [
+          {
+            "node": "Format Cart Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "77e8ef7f-ae55-44a7-a0e4-223de31bdb3a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5c63e1e3f07ac87c82d219fef349d069c81140a0dd45a3c346253ac0488b9830"
+  },
+  "id": "fDl5fSLMmVeMZmYM",
+  "tags": []
+}
