@@ -23,7 +23,7 @@
             {
               "id": "017534a8-c35b-4538-84cc-7ac02848d4f2",
               "leftValue": "={{ $json.query['hub.verify_token'] }}",
-              "rightValue": "Lucky7",
+              "rightValue": "YOUR_VERIFY_TOKEN",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -72,7 +72,7 @@
       ],
       "id": "7648f501-849a-4eab-bb29-10c6aa953571",
       "name": "fb-verify",
-      "webhookId": "133a867e-d662-4243-a165-43b94d86cfba"
+      "webhookId": "YOUR_WEBHOOK_ID"
     },
     {
       "parameters": {
@@ -285,7 +285,7 @@
     },
     {
       "parameters": {
-        "description": "Call this tool to notify the human admin. You MUST provide the customer's name, their Facebook sender_id, and the full text of their current request so the admin knows what the conversation is about.\n\n***Send data in json format like that:\n\n{\n  \"customer_name\": \"Ye Htet\",\n  \"sender_id\": \"27047995408169808\",\n  \"customer_query\": \"Want to talk to admin about my skin allergy\"\n}",
+        "description": "Call this tool to notify the human admin. You MUST provide the customer's name, their Facebook sender_id, and the full text of their current request so the admin knows what the conversation is about.\n\n***Send data in json format like that:\n\n{\n  \"customer_name\": \"Example Customer\",\n  \"sender_id\": \"YOUR_SENDER_ID\",\n  \"customer_query\": \"Want to talk to admin about my skin allergy\"\n}",
         "workflowId": {
           "__rl": true,
           "value": "=B4OtYMVQAkrCu9Ng",
@@ -498,7 +498,7 @@
       ],
       "id": "39075d7c-58f7-4704-85c7-c19dab775c99",
       "name": "Facebook Webhook",
-      "webhookId": "133a867e-d662-4243-a165-43b94d86cfba"
+      "webhookId": "YOUR_WEBHOOK_ID"
     },
     {
       "parameters": {
@@ -612,14 +612,14 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM"
+          "value": "YOUR_GOOGLE_SHEET_ID"
         },
         "sheetName": {
           "__rl": true,
           "value": 643198829,
           "mode": "list",
           "cachedResultName": "inventory",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=643198829"
         },
         "options": {}
       },
@@ -1242,7 +1242,6 @@
       "name": "Modify Cart Data"
     }
   ],
-  "pinData": {},
   "connections": {
     "If": {
       "main": [

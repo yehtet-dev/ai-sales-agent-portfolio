@@ -5,7 +5,7 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "id"
         },
         "sheetName": {
@@ -13,7 +13,7 @@
           "value": 643198829,
           "mode": "list",
           "cachedResultName": "inventory",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=643198829"
         },
         "filtersUI": {
           "values": [
@@ -137,16 +137,6 @@
       "name": "Filter"
     }
   ],
-  "pinData": {
-    "Execute Workflow Trigger": [
-      {
-        "json": {
-          "category_name": "Body Scrub",
-          "sender_id": "27571274165899350"
-        }
-      }
-    ]
-  },
   "connections": {
     "Execute Workflow Trigger": {
       "main": [

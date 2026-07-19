@@ -136,8 +136,8 @@ All import-ready workflow JSON files are in [`workflows/`](workflows/):
 2. Configure credentials: Facebook Graph API, Telegram Bot, OpenRouter, Google Sheets OAuth2.
 3. Create the `inventory` Google Sheet with columns: `Product Name`, `Category`, `Price_Retail`, `Price_Wholesale`, `Price_Bulk`, `Price_SuperBulk`, `Qty_Tier2`, `Qty_Tier3`, `Qty_Tier4`, `Instock`, `Product Image URL`.
 4. Create the `Orders` Google Sheet with columns for order details.
-5. Set the Telegram admin chat ID in the admin notification nodes (currently `5452598419`).
-6. Connect the Facebook app webhook to the n8n Facebook Webhook URL and verify with `hub.verify_token=Lucky7`.
+5. Set the Telegram admin chat ID in the admin notification nodes (replace `YOUR_CHAT_ID`).
+6. Connect the Facebook app webhook to the n8n Facebook Webhook URL and verify with `hub.verify_token=YOUR_VERIFY_TOKEN`.
 
 ---
 

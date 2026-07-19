@@ -79,7 +79,7 @@
     },
     {
       "parameters": {
-        "chatId": "=5452598419",
+        "chatId": "=YOUR_CHAT_ID",
         "text": "=={{ $json.summary_message }}\n\nSystemRef: {{ $execution.resumeUrl }}",
         "additionalFields": {
           "parse_mode": "HTML"
@@ -93,7 +93,7 @@
         6400,
         2816
       ],
-      "webhookId": "652a7594-042d-46cf-a14a-d19d87af9163",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -130,7 +130,7 @@
         6896,
         2992
       ],
-      "webhookId": "86b7b43d-e322-42fd-a544-936f1e1fa809"
+      "webhookId": "YOUR_WEBHOOK_ID"
     },
     {
       "parameters": {
@@ -183,7 +183,7 @@
         "operation": "update",
         "documentId": {
           "__rl": true,
-          "value": "=1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "value": "=YOUR_GOOGLE_SHEET_ID",
           "mode": "id"
         },
         "sheetName": {
@@ -397,7 +397,7 @@
       "parameters": {
         "documentId": {
           "__rl": true,
-          "value": "=1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM",
+          "value": "=YOUR_GOOGLE_SHEET_ID",
           "mode": "id"
         },
         "sheetName": {
@@ -405,7 +405,7 @@
           "value": 643198829,
           "mode": "list",
           "cachedResultName": "inventory",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nqBXgmAmFBXmjq7iZ11IDZcKybJQhUjJ6jRKnXsUlqM/edit#gid=643198829"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=643198829"
         },
         "filtersUI": {
           "values": [
@@ -851,21 +851,6 @@
       "name": "Pending Order Table"
     }
   ],
-  "pinData": {
-    "Execute Workflow Trigger": [
-      {
-        "json": {
-          "action": "order",
-          "customer_name": "Ye Htet Soe",
-          "customer_phone": "0979044444414",
-          "customer_address": "86th Street",
-          "payment_method": "Kpay",
-          "sender_id": "27571274165899350",
-          "cart_summary": "0 ([object Object] ခု)"
-        }
-      }
-    ]
-  },
   "connections": {
     "Execute Workflow Trigger": {
       "main": [

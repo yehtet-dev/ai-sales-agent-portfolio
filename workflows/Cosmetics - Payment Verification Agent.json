@@ -59,7 +59,7 @@
     },
     {
       "parameters": {
-        "chatId": "5452598419",
+        "chatId": "YOUR_CHAT_ID",
         "text": "=💳 *Payment Verification - Admin Confirmation Required*\n\n*Customer:* {{ $json.customer_name }}\n*Customer Phone:* {{ $json.customer_phone }}\n*Customer Fb ID* {{ $json.sender_id }}\n*Order:* {{ $json.order_summary }}\n*Product:* {{ $json.product_name }} \n*Total:* {{ $json.total_price }} MMK\n\n*AI Verification Status:* {{ $json.verification_status }}\n*Transaction ID:* {{ $json.transaction_id || 'N/A' }}\n*Amount Paid:* {{ $json.amount_paid || 'N/A' }} MMK\n*Expected Amount:* {{ $json.expected_amount || 'N/A' }} MMK\n*Payment Method:* {{ $json.payment_method || 'N/A' }}\n*Sender:* {{ $json.sender_name || 'N/A' }}\n*Receiver:* {{ $json.receiver_name || 'N/A' }}\n*Screenshot:* \n\n{{ $json.notes ? '📝 AI Notes: ' + $json.notes : '' }}\n\n💡 *Please confirm the payment:*\n• Reply `confirm` - Payment is correct, close order as SUCCESS\n• Reply `fail` - Payment is invalid, close order as FAILED\n\nSystemRef: {{ $execution.resumeUrl }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -73,7 +73,7 @@
         -3296,
         1136
       ],
-      "webhookId": "91cc2fcc-3bbf-4116-a423-14b01e6c8079",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "telegramApi": {
           "id": "TWlA69tHPNjJo4sH",
@@ -111,7 +111,7 @@
         -2848,
         1136
       ],
-      "webhookId": "4b1d6f87-bce0-45fb-b970-7448e14374fc",
+      "webhookId": "YOUR_WEBHOOK_ID",
       "credentials": {
         "httpBasicAuth": {
           "id": "cQ5w1fBHASP1p20Q",
@@ -204,7 +204,7 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1eY96lIjfUcXfiLnGLlAITTai5Vn3aLDjoN9Fkbonm04",
+          "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "id"
         },
         "sheetName": {
@@ -212,7 +212,7 @@
           "value": 763017813,
           "mode": "list",
           "cachedResultName": "Orders",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eY96lIjfUcXfiLnGLlAITTai5Vn3aLDjoN9Fkbonm04/edit#gid=763017813"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=763017813"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -591,17 +591,6 @@
       "onError": "continueRegularOutput"
     }
   ],
-  "pinData": {
-    "Execute Workflow Trigger": [
-      {
-        "json": {
-          "query": "PAYMENT_RECEIPT",
-          "sender_id": "27571274165899350",
-          "screenshot_url": "https://scontent.xx.fbcdn.net/v/t1.15752-9/684155586_1926287521345523_8244654004869899102_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=eb2e90&_nc_ohc=tAiXw9jZMAwQ7kNvwHBwr8D&_nc_oc=Adr85klNkRfXgJZiLx39_x0EqVHQjbrrkE6mZ3cJmzM3Uhxzu4a5Xfg0_LJoDaXGAA8qlqtD_Xhf_BE96v6riFcF&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent.xx&oh=03_Q7cD5QHH1gGnKH7oPafZJN6NnaWzEpbLAqPVN8z7IqvPtMBHmA&oe=6A24100B"
-        }
-      }
-    ]
-  },
   "connections": {
     "Execute Workflow Trigger": {
       "main": [
